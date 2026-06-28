@@ -1,0 +1,17 @@
+# Argus — list every Hermes instance you want to watch.
+refresh_seconds: 5
+
+instances:
+  - name: local
+    transport: local
+    profile: orchestrator
+    hermes_home: "C:/Users/you/AppData/Local/hermes"
+    hermes_bin: "C:/Users/you/AppData/Local/hermes/hermes-agent/venv/Scripts/hermes"
+
+  - name: vps
+    transport: ssh
+    profile: orchestrator
+    ssh: "user@your.vps.ip"
+    ssh_key: "C:/Users/you/.ssh/your_key"
+    hermes_home: "/home/user/.hermes"
+    hermes_bin: "/home/user/.hermes/hermes-agent/venv/bin/hermes"
