@@ -131,6 +131,29 @@ export type Overview = {
   refresh_seconds: number;
   instances: InstanceOverview[];
   claude_agents: ClaudeAgent[];
+  features?: { skill_review?: boolean };
+};
+
+export type SkillGap = {
+  title: string;
+  evidence: string;
+  recommendation: string;
+  target_skill: string;
+  suggested_edit: string;
+};
+
+export type SkillHealth = { skill: string; finding: string; severity: string };
+export type DriftItem = { concern: string; detail: string };
+
+export type ReviewReport = {
+  generated_at: string;
+  instance: string;
+  model: string;
+  sessions_reviewed: string[];
+  summary: string;
+  gaps: SkillGap[];
+  health: SkillHealth[];
+  drift: DriftItem[];
 };
 
 export type ConfigInstance = {

@@ -1,8 +1,9 @@
 import { useState, lazy, Suspense } from 'react';
 import { useOverview } from './useOverview';
 import { SettingsModal } from './settings/SettingsModal';
-import { Tabs, type TabKey } from './nav/Tabs';
+import { Tabs, TABS, type TabKey, type TabDef } from './nav/Tabs';
 import { SummaryView } from './summary/SummaryView';
+import { ReviewTab } from './review/ReviewTab';
 import { BoardTab } from './board/BoardTab';
 import { FleetPanel } from './panels/FleetPanel';
 import { ClaudeAgentsPanel } from './panels/ClaudeAgentsPanel';
@@ -28,12 +29,14 @@ function Header({
   active,
   onSelect,
   onOpenSettings,
+  tabs,
 }: {
   stale: boolean;
   lastUpdated: Date | null;
   active: TabKey;
   onSelect: (k: TabKey) => void;
   onOpenSettings: () => void;
+  tabs: TabDef[];
 }) {
   return (
     <header
@@ -84,7 +87,7 @@ function Header({
         </div>
       </div>
       <div className="px-5 pb-2">
-        <Tabs active={active} onSelect={onSelect} />
+        <Tabs active={active} onSelect={onSelect} tabs={tabs} />
       </div>
     </header>
   );
@@ -113,6 +116,8 @@ export default function App() {
 
   const { instances } = data;
   const claudeAgents = data.claude_agents ?? [];
+  // the Review tab only appears when the opt-in Claude skill review is available
+  const visibleTabs = data.features?.skill_review ? TABS : TABS.filter((t) => t.key !== 'review');
 
   return (
     <div className="min-h-screen" style={{ background: '#0a0a0b' }}>
@@ -122,6 +127,7 @@ export default function App() {
         active={tab}
         onSelect={setTab}
         onOpenSettings={() => setSettingsOpen(true)}
+        tabs={visibleTabs}
       />
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
@@ -141,6 +147,7 @@ export default function App() {
           </>
         )}
         {tab === 'agents' && <ClaudeAgentsPanel agents={claudeAgents} />}
+        {tab === 'review' && <ReviewTab instances={instances.map((i) => i.name)} />}
         {tab === 'insights' && (
           <>
             <UsagePanel instances={instances} />

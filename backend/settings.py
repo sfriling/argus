@@ -43,6 +43,9 @@ class AppConfig(BaseModel):
     claude_home: str = "~/.claude"      # local Claude Code home; "" disables that panel
     enable_config_writes: bool = False  # gate for the Settings-UI write endpoints
     enable_actions: bool = False        # gate for kanban (and future) write actions
+    enable_skill_review: bool = False   # gate for the Claude-powered skill review (opt-in)
+    skill_review_model: str = "claude-opus-4-8"
+    anthropic_api_key: str = ""         # prefer the ANTHROPIC_API_KEY env var over this
     instances: list[Instance] = Field(default_factory=list)
 
     @property
@@ -147,6 +150,18 @@ def actions_writable(config: AppConfig, bind_host: Optional[str] = None) -> bool
     server is bound to localhost. Separate from config writes so they switch independently."""
     host = bind_host if bind_host is not None else config.host
     return bool(config.enable_actions) and is_localhost(host)
+
+
+def anthropic_key(config: AppConfig) -> str:
+    """The Anthropic API key — env var wins over the config field."""
+    return os.environ.get("ANTHROPIC_API_KEY", "").strip() or (config.anthropic_api_key or "").strip()
+
+
+def skill_review_available(config: AppConfig, bind_host: Optional[str] = None) -> bool:
+    """The Claude skill review is available only when explicitly enabled, bound to localhost,
+    and an Anthropic key is present. Off → the feature is invisible and inert."""
+    host = bind_host if bind_host is not None else config.host
+    return bool(config.enable_skill_review) and is_localhost(host) and bool(anthropic_key(config))
 
 
 # backward-compatible alias (older callers/tests import load_config)

@@ -12,13 +12,18 @@ from backend import settings
 from backend.settings import (
     AppConfig,
     actions_writable,
+    anthropic_key,
     config_writable,
     resolve_config_path,
     save,
+    skill_review_available,
     validate,
 )
 from backend import kanban_actions
 from backend import session_detail
+from backend import skill_review as sr
+from backend.collectors.sessions import collect_sessions
+from backend.models import Features
 from backend.transport import make_runner
 
 
@@ -37,7 +42,10 @@ def create_app(config=None, aggregator=None) -> FastAPI:
     @app.get("/api/overview")
     def overview():
         now_iso = datetime.now(timezone.utc).isoformat()
-        return agg.get(now_iso)
+        ov = agg.get(now_iso)
+        # features depend on the bound host + key, which the aggregator doesn't see.
+        ov.features = Features(skill_review=skill_review_available(agg.config, bind_host))
+        return ov
 
     @app.get("/api/config")
     def get_config():
@@ -76,6 +84,47 @@ def create_app(config=None, aggregator=None) -> FastAPI:
             if inst.name == name:
                 return inst
         raise HTTPException(status_code=404, detail=f"no instance named {name!r}")
+
+    @app.post("/api/skill-review/{instance}/run")
+    def skill_review_run(instance: str):
+        inst = _instance_or_404(instance)
+        if not skill_review_available(agg.config, bind_host):
+            raise HTTPException(
+                status_code=403,
+                detail=("Skill review is off. Set enable_skill_review: true, bind Argus to "
+                        "localhost, and provide an ANTHROPIC_API_KEY."),
+            )
+        runner = make_runner(inst)
+        events = sr.read_trajectory(runner, inst)
+        sessions = collect_sessions(runner, inst, limit=12)
+        ids = sr.triage(events, sessions, limit=5)
+        skills, names, custom = sr.gather_skills(runner, inst)
+
+        # cross-instance drift (deterministic, no LLM)
+        per_inst = {inst.name: custom}
+        for other in agg.config.instances:
+            if other.name != inst.name:
+                try:
+                    _, _, oc = sr.gather_skills(make_runner(other), other)
+                    per_inst[other.name] = oc
+                except Exception:
+                    pass
+        drift = sr.skill_drift(per_inst)
+
+        context = sr.assemble(runner, inst, ids, skills, names)
+        now_iso = datetime.now(timezone.utc).isoformat()
+        try:
+            report = sr.review(context, agg.config.skill_review_model, anthropic_key(agg.config),
+                               instance, ids, now_iso)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"review failed: {str(e)[:300]}")
+        report.drift = drift
+        app.state.skill_report = report
+        return report
+
+    @app.get("/api/skill-review/report")
+    def skill_review_report():
+        return getattr(app.state, "skill_report", None)
 
     @app.get("/api/sessions/{instance}/{session_id}")
     def session_drilldown(instance: str, session_id: str):

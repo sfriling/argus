@@ -1,4 +1,4 @@
-export type TabKey = 'summary' | 'map' | 'board' | 'fleet' | 'agents' | 'insights';
+export type TabKey = 'summary' | 'map' | 'board' | 'fleet' | 'agents' | 'insights' | 'review';
 
 export type TabDef = { key: TabKey; label: string; icon: string };
 
@@ -9,18 +9,21 @@ export const TABS: TabDef[] = [
   { key: 'fleet', label: 'Fleet', icon: '⊞' },
   { key: 'agents', label: 'Agents', icon: '◆' },
   { key: 'insights', label: 'Insights', icon: '▤' },
+  { key: 'review', label: 'Review', icon: '✦' },
 ];
 
 export function Tabs({
   active,
   onSelect,
+  tabs = TABS,
 }: {
   active: TabKey;
   onSelect: (key: TabKey) => void;
+  tabs?: TabDef[];
 }) {
   return (
     <nav className="flex items-center gap-1" role="tablist">
-      {TABS.map((t) => {
+      {tabs.map((t) => {
         const on = t.key === active;
         return (
           <button

@@ -14,6 +14,11 @@ describe('App tabbed navigation', () => {
     expect(screen.getByText('Live Now')).toBeInTheDocument();
   });
 
+  it('hides the Review tab unless skill review is available', () => {
+    render(<App />);   // sample overview has no features.skill_review
+    expect(screen.queryByRole('tab', { name: 'Review' })).not.toBeInTheDocument();
+  });
+
   it('switches to the Fleet tab', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('tab', { name: 'Fleet' }));

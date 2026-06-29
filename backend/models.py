@@ -127,6 +127,40 @@ class SessionDetail(BaseModel):
     messages: list[SessionMessage] = Field(default_factory=list)
 
 
+class SkillGap(BaseModel):
+    title: str
+    evidence: str = ""               # which session + what went wrong
+    recommendation: str = ""
+    target_skill: str = ""           # an existing skill to harden, or "new"
+    suggested_edit: str = ""         # the concrete text/diff to add
+
+
+class SkillHealth(BaseModel):
+    skill: str
+    finding: str
+    severity: str = "info"           # "info" | "warn"
+
+
+class DriftItem(BaseModel):
+    concern: str
+    detail: str = ""
+
+
+class ReviewReport(BaseModel):
+    generated_at: str = ""
+    instance: str = ""
+    model: str = ""
+    sessions_reviewed: list[str] = Field(default_factory=list)
+    summary: str = ""
+    gaps: list[SkillGap] = Field(default_factory=list)
+    health: list[SkillHealth] = Field(default_factory=list)
+    drift: list[DriftItem] = Field(default_factory=list)
+
+
+class Features(BaseModel):
+    skill_review: bool = False
+
+
 class PanelError(BaseModel):
     panel: str
     message: str
@@ -154,3 +188,4 @@ class Overview(BaseModel):
     refresh_seconds: int = 5
     instances: list[InstanceOverview] = Field(default_factory=list)
     claude_agents: list[ClaudeAgent] = Field(default_factory=list)
+    features: Features = Field(default_factory=Features)
