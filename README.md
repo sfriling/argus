@@ -13,37 +13,56 @@ It does this without any agent-side install: it just runs the `hermes` CLI and r
 files — locally and over SSH — and never changes anything (read-only by design, safe to
 self-host).
 
-## Panels (v1)
+## Panels
 - **Fleet** — per-instance gateway/dispatcher health, active profile, tasks in flight.
 - **Delegation** — kanban status counts + in-flight tasks per board.
 - **Crons** — name · schedule · next run · last status.
 - **Reliability Guard** — recent catches (inferred / rejected / loop-break) + today's tally.
+- **Usage** — sessions, tool calls, and token totals per instance over the last 7 days, with
+  per-model token bars and top tools. (Tokens, not dollars — Hermes meters tokens, and most
+  fleets mix subscriptions and credits.)
+- **Recent Sessions** — the latest sessions per instance, cron runs flagged.
 - **Profiles** — the profiles per instance, active highlighted.
-
-(Cost tracking and session history are planned for v1.1.)
 
 ## Requirements
 - Python 3.11+ and Node 20+ (build the UI once).
 - The `hermes` CLI reachable for each instance (locally, and/or over SSH for remotes).
 
 ## Setup
+
+One command (creates `config.yaml`, a venv, installs deps, builds the UI):
 ```bash
-# 1. configure your instances
-cp config.example.yaml config.yaml      # then edit paths / ssh targets
-
-# 2. backend deps
-python -m venv .venv && .venv/Scripts/pip install -r backend/requirements.txt   # (bin/pip on *nix)
-
-# 3. build the UI
-cd frontend && npm install && npm run build && cd ..
-
-# 4. run
-.venv/Scripts/python -m uvicorn backend.app:create_app --factory --port 7700
+./scripts/setup.sh        # Linux/macOS
+.\scripts\setup.ps1       # Windows (PowerShell)
+```
+Then edit `config.yaml` to point at your instances and run:
+```bash
+.venv/bin/python -m uvicorn backend.app:create_app --factory --port 7700   # .venv\Scripts\python on Windows
 # open http://localhost:7700
 ```
 
+<details><summary>Manual setup (what the script does)</summary>
+
+```bash
+cp config.example.yaml config.yaml                      # 1. configure instances
+python -m venv .venv                                    # 2. backend deps
+.venv/Scripts/pip install -r backend/requirements.txt   #    (bin/pip on *nix)
+cd frontend && npm install && npm run build && cd ..    # 3. build the UI
+.venv/Scripts/python -m uvicorn backend.app:create_app --factory --port 7700   # 4. run
+```
+</details>
+
 `config.yaml` lists each instance: a `local` transport runs `hermes` directly; an `ssh`
 transport runs the same calls over an SSH key. See `config.example.yaml`.
+
+### Run on login (optional)
+`run-argus.cmd` launches Argus hidden and logs to `%LOCALAPPDATA%\argus.log`. To start it
+automatically on Windows login, drop a one-line `.vbs` shim that calls it into your Startup
+folder (`shell:startup`):
+```vbs
+CreateObject("WScript.Shell").Run """<repo>\run-argus.cmd""", 0, False
+```
+On Linux, run it under a systemd **user** service or your process manager of choice.
 
 ## Develop
 - Backend tests: `.venv/Scripts/python -m pytest -q`
