@@ -25,7 +25,9 @@ function TaskCard({
     >
       <p className="text-sm" style={{ color: '#f4f4f5', overflowWrap: 'anywhere' }}>{task.title}</p>
       <div className="flex items-center gap-2 mt-1.5 text-xs" style={{ color: '#52525b' }}>
-        {task.assignee && <span className="font-mono">@{task.assignee}</span>}
+        {task.assignee
+          ? <span className="font-mono">@{task.assignee}</span>
+          : <span style={{ color: '#3f3f46' }}>unassigned</span>}
         <span className="ml-auto" style={{ color: STATUS_COLOR[task.status] ?? '#52525b' }}>{task.status}</span>
       </div>
     </div>

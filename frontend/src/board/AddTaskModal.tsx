@@ -18,7 +18,7 @@ export function AddTaskModal({
 }) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [assignee, setAssignee] = useState(profiles[0] ?? '');
+  const [assignee, setAssignee] = useState(''); // default unassigned → stages, won't run
 
   return (
     <div
@@ -49,9 +49,12 @@ export function AddTaskModal({
           <span className="text-xs uppercase tracking-wider" style={{ color: '#52525b' }}>Assignee</span>
           <select className={FIELD} style={FIELD_STYLE} value={assignee}
             onChange={(e) => setAssignee(e.target.value)}>
-            <option value="">(unassigned)</option>
+            <option value="">(unassigned — stage it)</option>
             {profiles.map((p) => <option key={p} value={p}>{p}</option>)}
           </select>
+          <span className="text-xs" style={{ color: '#52525b' }}>
+            Unassigned tasks wait in Ready without running. Assign one (here or from its card) to start it.
+          </span>
         </label>
 
         {error && <p className="text-xs" style={{ color: '#fca5a5' }}>{error}</p>}
