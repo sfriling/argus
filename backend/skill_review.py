@@ -223,23 +223,77 @@ def report_from_tool_input(data: dict, instance: str, model: str, sessions: list
     )
 
 
-def review(context: str, model: str, api_key: str, instance: str, sessions: list[str],
-           now_iso: str, client: Optional[Any] = None) -> ReviewReport:
-    """Call Claude with a forced structured-output tool and parse the result. `client` is
-    injectable for tests; otherwise an anthropic.Anthropic is constructed lazily."""
+def _review_via_api(context: str, model: str, api_key: str, client: Optional[Any]) -> dict:
+    """Anthropic API path — forced structured-output tool. Returns the tool input dict."""
     if client is None:
         import anthropic  # lazy: optional dependency
         client = anthropic.Anthropic(api_key=api_key)
     resp = client.messages.create(
-        model=model,
-        max_tokens=4096,
-        system=SYSTEM,
+        model=model, max_tokens=4096, system=SYSTEM,
         messages=[{"role": "user", "content": context}],
-        tools=[REVIEW_TOOL],
-        tool_choice={"type": "tool", "name": "submit_review"},
+        tools=[REVIEW_TOOL], tool_choice={"type": "tool", "name": "submit_review"},
     )
     for block in resp.content:
         if getattr(block, "type", None) == "tool_use" and getattr(block, "name", None) == "submit_review":
-            data = block.input if isinstance(block.input, dict) else json.loads(block.input)
-            return report_from_tool_input(data, instance, model, sessions, now_iso)
+            return block.input if isinstance(block.input, dict) else json.loads(block.input)
     raise ValueError("Claude did not return a structured review")
+
+
+# The CLI can't force tool-use, so we ask for raw JSON matching the same shape.
+_JSON_SCHEMA_HINT = (
+    'Respond with ONLY a JSON object (no prose, no markdown fences) of the form: '
+    '{"summary": str, "gaps": [{"title": str, "evidence": str, "recommendation": str, '
+    '"target_skill": "<existing skill name>"|"new", "suggested_edit": str}], '
+    '"health": [{"skill": str, "finding": str, "severity": "info"|"warn"}]}.'
+)
+
+
+def build_cli_prompt(context: str) -> str:
+    return f"{SYSTEM}\n\n{_JSON_SCHEMA_HINT}\nDo not use any tools; work only from the text below.\n\n{context}"
+
+
+def parse_cli_result(stdout: str) -> dict:
+    """Pull the model's text out of `claude -p --output-format json`, then parse it as the review JSON."""
+    outer = json.loads(stdout)
+    text = str(outer.get("result") or "").strip()
+    if text.startswith("```"):
+        text = text.strip("`")
+        text = text[text.find("{"):]
+    text = text[text.find("{"): text.rfind("}") + 1] if "{" in text else text
+    data = json.loads(text)
+    if not isinstance(data, dict):
+        raise ValueError("CLI review did not return a JSON object")
+    return data
+
+
+def _default_cli_run(claude_bin: str, model: str, prompt: str) -> str:
+    import shutil
+    import subprocess
+    # Resolve the real path — on Windows the npm shim is `claude.CMD`, which CreateProcess
+    # won't find from the bare name "claude".
+    exe = shutil.which(claude_bin) or claude_bin
+    no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    p = subprocess.run(
+        [exe, "-p", "--output-format", "json", "--model", model],
+        input=prompt, capture_output=True, text=True, encoding="utf-8", errors="replace",
+        timeout=300, creationflags=no_window,
+    )
+    if p.returncode != 0:
+        raise ValueError((p.stderr or p.stdout or "claude CLI failed").strip()[:300])
+    return p.stdout
+
+
+def _review_via_cli(context: str, model: str, claude_bin: str, run=_default_cli_run) -> dict:
+    """Claude Code CLI path — uses the logged-in subscription auth, no API key. `run` is injectable."""
+    return parse_cli_result(run(claude_bin, model, build_cli_prompt(context)))
+
+
+def review(context: str, model: str, api_key: str, instance: str, sessions: list[str],
+           now_iso: str, claude_bin: str = "claude", client: Optional[Any] = None, run=_default_cli_run) -> ReviewReport:
+    """Review via the Anthropic API (when an api_key/client is given) or the Claude Code CLI
+    (subscription auth) otherwise. Returns a validated ReviewReport."""
+    if client is not None or api_key:
+        data = _review_via_api(context, model, api_key, client)
+    else:
+        data = _review_via_cli(context, model, claude_bin, run=run)
+    return report_from_tool_input(data, instance, model, sessions, now_iso)

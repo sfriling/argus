@@ -76,7 +76,8 @@ export function ReviewTab({ instances }: { instances: string[] }) {
 
       <p className="text-xs" style={{ color: '#52525b' }}>
         Triages the sessions that struggled, has Claude review them against your skills, and proposes
-        edits. Read-only — nothing is changed. (Uses your Anthropic key; a run costs a few cents.)
+        edits. Read-only — nothing is changed. (Uses your Claude Code subscription, or an Anthropic
+        API key if set; a run costs a few cents.)
       </p>
 
       {error && <p className="text-sm" style={{ color: '#fca5a5' }}>{error}</p>}

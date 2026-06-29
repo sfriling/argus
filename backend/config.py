@@ -7,6 +7,7 @@ from backend.settings import (  # noqa: F401
     actions_writable,
     anthropic_key,
     config_writable,
+    has_claude_cli,
     skill_review_available,
     default_config,
     is_localhost,

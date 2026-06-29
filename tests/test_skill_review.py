@@ -3,7 +3,13 @@ from fastapi.testclient import TestClient
 from backend.app import create_app
 from backend.config import AppConfig, Instance, skill_review_available
 from backend.models import Overview, ReviewReport
-from backend.skill_review import triage, skill_drift, report_from_tool_input, review
+import json
+import sys
+
+from backend.skill_review import (
+    triage, skill_drift, report_from_tool_input, review,
+    build_cli_prompt, parse_cli_result,
+)
 from backend.transport import RunResult
 
 
@@ -96,11 +102,37 @@ def test_review_parses_tool_use():
 def test_skill_review_available_truth_table(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
     on = AppConfig(enable_skill_review=True, host="127.0.0.1")
-    assert skill_review_available(on) is True
+    assert skill_review_available(on) is True                          # key present
     assert skill_review_available(on, bind_host="0.0.0.0") is False    # not localhost
     assert skill_review_available(AppConfig(enable_skill_review=False, host="127.0.0.1")) is False
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    assert skill_review_available(on) is False                        # no key
+    # no key + no Claude CLI → unavailable
+    no_cli = AppConfig(enable_skill_review=True, host="127.0.0.1", claude_bin="definitely-not-a-real-binary-xyz")
+    assert skill_review_available(no_cli) is False
+    # no key + a Claude CLI on PATH → available (subscription path). Use this interpreter as a stand-in.
+    on_cli = AppConfig(enable_skill_review=True, host="127.0.0.1", claude_bin=sys.executable)
+    assert skill_review_available(on_cli) is True
+
+
+def test_build_cli_prompt_has_schema():
+    p = build_cli_prompt("THE CONTEXT")
+    assert "JSON object" in p and "THE CONTEXT" in p
+
+
+def test_parse_cli_result_plain_and_fenced():
+    body = {"summary": "s", "gaps": [], "health": []}
+    plain = json.dumps({"result": json.dumps(body)})
+    assert parse_cli_result(plain)["summary"] == "s"
+    fenced = json.dumps({"result": "```json\n" + json.dumps(body) + "\n```"})
+    assert parse_cli_result(fenced)["summary"] == "s"
+
+
+def test_review_via_cli_path():
+    stdout = json.dumps({"result": json.dumps({"summary": "from-cli", "gaps": [], "health": []})})
+    def fake_run(claude_bin, model, prompt):
+        return stdout
+    r = review("ctx", "m", "", "local", ["s1"], "now", claude_bin="claude", run=fake_run)
+    assert r.summary == "from-cli"          # no key + no client → CLI path
 
 
 def _client(monkeypatch, cfg, run_result=None):

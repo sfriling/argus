@@ -3,6 +3,7 @@ locating, and writing config. The CLI and the Settings UI both go through here."
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -46,6 +47,7 @@ class AppConfig(BaseModel):
     enable_skill_review: bool = False   # gate for the Claude-powered skill review (opt-in)
     skill_review_model: str = "claude-opus-4-8"
     anthropic_api_key: str = ""         # prefer the ANTHROPIC_API_KEY env var over this
+    claude_bin: str = "claude"          # Claude Code CLI — used (subscription auth) when no API key
     instances: list[Instance] = Field(default_factory=list)
 
     @property
@@ -157,11 +159,21 @@ def anthropic_key(config: AppConfig) -> str:
     return os.environ.get("ANTHROPIC_API_KEY", "").strip() or (config.anthropic_api_key or "").strip()
 
 
+def has_claude_cli(config: AppConfig) -> bool:
+    """Whether the Claude Code CLI is on PATH (subscription-auth review path)."""
+    return bool(shutil.which(config.claude_bin or "claude"))
+
+
 def skill_review_available(config: AppConfig, bind_host: Optional[str] = None) -> bool:
-    """The Claude skill review is available only when explicitly enabled, bound to localhost,
-    and an Anthropic key is present. Off → the feature is invisible and inert."""
+    """The Claude skill review is available when enabled, bound to localhost, and Claude is
+    reachable EITHER via an Anthropic API key OR the Claude Code CLI (subscription auth).
+    Off → the feature is invisible and inert."""
     host = bind_host if bind_host is not None else config.host
-    return bool(config.enable_skill_review) and is_localhost(host) and bool(anthropic_key(config))
+    return (
+        bool(config.enable_skill_review)
+        and is_localhost(host)
+        and (bool(anthropic_key(config)) or has_claude_cli(config))
+    )
 
 
 # backward-compatible alias (older callers/tests import load_config)

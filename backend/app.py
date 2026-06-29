@@ -115,7 +115,7 @@ def create_app(config=None, aggregator=None) -> FastAPI:
         now_iso = datetime.now(timezone.utc).isoformat()
         try:
             report = sr.review(context, agg.config.skill_review_model, anthropic_key(agg.config),
-                               instance, ids, now_iso)
+                               instance, ids, now_iso, claude_bin=agg.config.claude_bin)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"review failed: {str(e)[:300]}")
         report.drift = drift
