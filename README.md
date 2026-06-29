@@ -19,10 +19,13 @@ A **Summary** landing page plus three detail tabs keep it calm:
 - **Summary** — the at-a-glance: an attention strip ("all systems nominal" or what needs
   you), per-instance health, **Live Now** (active Claude agents · kanban in-flight · next
   cron), and **Today** tiles (catches · loop-breaks · tokens · sessions).
+- **Board** — an interactive kanban board per instance (backed by the `hermes kanban` CLI):
+  drag cards between human-valid columns, add tasks, comment, assign, archive. **Read-only
+  unless** `enable_actions: true` (and bound to localhost) — see Configuration.
 - **Fleet** — per-instance gateway/dispatcher health & profiles, plus crons
   (name · schedule · next run · last status).
 - **Agents** — this desktop's Claude Code background agents (read from `~/.claude`; active
-  pinned up top, recent below; hidden if you don't run Claude Code) and kanban **delegation**.
+  pinned up top, recent below; hidden if you don't run Claude Code).
 - **Insights** — usage (sessions · tool calls · token totals over 7 days, per-model bars,
   top tools — tokens not dollars), recent sessions, and the **reliability guard** tally.
 
@@ -66,6 +69,10 @@ Config is a single YAML file, managed three ways — pick whichever you like:
 - **Settings UI** — the gear in the header. Read-only by default; set
   `enable_config_writes: true` (and keep Argus bound to localhost) to add/edit instances
   and change port/refresh from the browser, with a confirm step before each write.
+
+Two independent write gates, both requiring a localhost bind: `enable_config_writes`
+(the Settings UI) and `enable_actions` (the Board's create/move/comment/assign/archive).
+Both default to `false` — Argus is fully read-only out of the box.
 
 Each instance: a `local` transport runs `hermes` directly; an `ssh` transport runs the same
 calls over an SSH key. See `config.example.yaml`.
