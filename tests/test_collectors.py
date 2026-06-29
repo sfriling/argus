@@ -5,6 +5,8 @@ from backend.collectors.gateway import parse_gateway
 from backend.collectors.kanban import collect_kanban
 from backend.collectors.profiles import collect_profiles
 from backend.collectors.reliability import parse_reliability
+from backend.collectors.sessions import parse_sessions
+from backend.collectors.usage import parse_usage
 from backend.transport import RunResult
 from tests.conftest import FakeRunner, make_instance
 
@@ -75,3 +77,90 @@ def test_reliability_counts_and_order():
 
 def test_reliability_missing_file():
     assert parse_reliability(None).today.catches == 0
+
+
+# Trimmed copy of a real `hermes insights --days 7` box.
+INSIGHTS = """
+  ╔══════════════════════════════════════════════════════════╗
+  ║                    📊 Hermes Insights                    ║
+  ║                       Last 7 days                        ║
+  ╚══════════════════════════════════════════════════════════╝
+
+  Period: Jun 23, 2026 — Jun 29, 2026
+
+  📋 Overview
+  ────────────────────────────────────────────────────────
+  Sessions:          18            Messages:        274
+  Tool calls:        106           User messages:   33
+  Input tokens:      1,299,215     Output tokens:   85,472
+  Total tokens:      5,524,527
+  Active time:       ~13h 47m      Avg session:     ~3h 26m
+
+  🤖 Models Used
+  ────────────────────────────────────────────────────────
+  Model                          Sessions       Tokens
+  grok-4.3                             17    5,501,145
+  grok-build-0.1                        1       23,382
+
+  🔧 Top Tools
+  ────────────────────────────────────────────────────────
+  Tool                            Calls        %
+  computer_use                       25    23.6%
+  patch                              21    19.8%
+  terminal                           13    12.3%
+"""
+
+
+def test_usage_headline_numbers():
+    u = parse_usage(INSIGHTS, days=7)
+    assert u.days == 7
+    assert u.sessions == 18
+    assert u.messages == 274
+    assert u.tool_calls == 106
+    assert u.input_tokens == 1_299_215
+    assert u.output_tokens == 85_472
+    assert u.total_tokens == 5_524_527
+    assert u.active_time == "~13h 47m"
+
+
+def test_usage_models_and_tools():
+    u = parse_usage(INSIGHTS, days=7)
+    assert [m.name for m in u.models] == ["grok-4.3", "grok-build-0.1"]
+    assert u.models[0].sessions == 17
+    assert u.models[0].tokens == 5_501_145
+    assert [t.name for t in u.top_tools] == ["computer_use", "patch", "terminal"]
+    assert u.top_tools[0].calls == 25
+
+
+def test_usage_empty():
+    assert parse_usage("").total_tokens == 0
+    assert parse_usage(None).sessions == 0
+
+
+# Trimmed copy of a real `hermes sessions list` table.
+SESSIONS = (
+    "Title                            Preview                                  Last Active   ID\n"
+    "──────────────────────────────────────────────────────────────────────────────────────\n"
+    "Obsidian Vault Broken Links Ch   in my obsidian vault, we seem to have    just now      20260629_093238_06533f\n"
+    "say-hi-every-minute · Jun 28 1   [IMPORTANT: You are running as a sched   19h ago       cron_6cdbc5e9096e_20260628_144020\n"
+    "—                                Reply with exactly: PONG                 19h ago       20260628_143310_3e4616\n"
+)
+
+
+def test_sessions_parse():
+    rows = parse_sessions(SESSIONS)
+    assert len(rows) == 3
+    assert rows[0].id == "20260629_093238_06533f"
+    assert rows[0].title == "Obsidian Vault Broken Links Ch"
+    assert rows[0].last_active == "just now"
+    assert rows[0].preview.startswith("in my obsidian vault")
+    # the em-dash placeholder title becomes empty
+    assert rows[2].title == ""
+    assert rows[2].id == "20260628_143310_3e4616"
+
+
+def test_sessions_limit_and_empty():
+    assert parse_sessions(SESSIONS, limit=1)[0].id == "20260629_093238_06533f"
+    assert len(parse_sessions(SESSIONS, limit=1)) == 1
+    assert parse_sessions("") == []
+    assert parse_sessions(None) == []

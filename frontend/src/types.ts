@@ -21,6 +21,37 @@ export type ReliabilityRecent = {
   attempt: number;
 };
 
+export type UsageModel = {
+  name: string;
+  sessions: number;
+  tokens: number;
+};
+
+export type UsageTool = {
+  name: string;
+  calls: number;
+};
+
+export type Usage = {
+  days: number;
+  sessions: number;
+  messages: number;
+  tool_calls: number;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  active_time: string;
+  models: UsageModel[];
+  top_tools: UsageTool[];
+};
+
+export type SessionEntry = {
+  id: string;
+  title: string;
+  preview: string;
+  last_active: string;
+};
+
 export type PanelError = {
   panel: string;
   message: string;
@@ -44,6 +75,8 @@ export type InstanceOverview = {
     today: { catches: number; loop_breaks: number };
     recent: ReliabilityRecent[];
   };
+  usage: Usage;
+  sessions: SessionEntry[];
   panel_errors: PanelError[];
 };
 

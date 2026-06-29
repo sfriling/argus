@@ -3,6 +3,8 @@ import { FleetPanel } from './panels/FleetPanel';
 import { DelegationPanel } from './panels/DelegationPanel';
 import { CronsPanel } from './panels/CronsPanel';
 import { ReliabilityPanel } from './panels/ReliabilityPanel';
+import { UsagePanel } from './panels/UsagePanel';
+import { SessionsPanel } from './panels/SessionsPanel';
 import { ProfilesPanel } from './panels/ProfilesPanel';
 
 function formatSecondsAgo(date: Date | null): string {
@@ -100,6 +102,8 @@ export default function App() {
         <DelegationPanel instances={instances} />
         <CronsPanel instances={instances} />
         <ReliabilityPanel instances={instances} />
+        <UsagePanel instances={instances} />
+        <SessionsPanel instances={instances} />
         <ProfilesPanel instances={instances} />
       </main>
 

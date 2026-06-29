@@ -69,6 +69,45 @@ const localInstance: InstanceOverview = {
       },
     ],
   },
+  usage: {
+    days: 7,
+    sessions: 18,
+    messages: 274,
+    tool_calls: 106,
+    input_tokens: 1_299_215,
+    output_tokens: 85_472,
+    total_tokens: 5_524_527,
+    active_time: '~13h 47m',
+    models: [
+      { name: 'grok-4.3', sessions: 17, tokens: 5_501_145 },
+      { name: 'grok-build-0.1', sessions: 1, tokens: 23_382 },
+    ],
+    top_tools: [
+      { name: 'computer_use', calls: 25 },
+      { name: 'patch', calls: 21 },
+      { name: 'terminal', calls: 13 },
+    ],
+  },
+  sessions: [
+    {
+      id: '20260629_093238_06533f',
+      title: 'Obsidian Vault Broken Links',
+      preview: 'in my obsidian vault, we seem to have',
+      last_active: 'just now',
+    },
+    {
+      id: 'cron_6cdbc5e9096e_20260628',
+      title: 'say-hi-every-minute',
+      preview: '[IMPORTANT: You are running as a sched',
+      last_active: '19h ago',
+    },
+    {
+      id: '20260628_143310_3e4616',
+      title: '',
+      preview: 'Reply with exactly: PONG',
+      last_active: '19h ago',
+    },
+  ],
   panel_errors: [],
 };
 
@@ -123,6 +162,29 @@ const vpsInstance: InstanceOverview = {
       },
     ],
   },
+  usage: {
+    days: 7,
+    sessions: 6,
+    messages: 48,
+    tool_calls: 22,
+    input_tokens: 412_006,
+    output_tokens: 19_220,
+    total_tokens: 1_104_722,
+    active_time: '~3h 12m',
+    models: [{ name: 'grok-4.3', sessions: 6, tokens: 1_104_722 }],
+    top_tools: [
+      { name: 'patch', calls: 9 },
+      { name: 'terminal', calls: 7 },
+    ],
+  },
+  sessions: [
+    {
+      id: '20260629_081502_aa12cd',
+      title: 'Refactor auth middleware',
+      preview: 'the auth middleware is doing too much',
+      last_active: '1h ago',
+    },
+  ],
   panel_errors: [],
 };
 

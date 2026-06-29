@@ -8,6 +8,8 @@ from backend.collectors.gateway import collect_gateway, dispatcher_lock_path
 from backend.collectors.kanban import collect_kanban
 from backend.collectors.profiles import collect_profiles
 from backend.collectors.reliability import collect_reliability
+from backend.collectors.sessions import collect_sessions
+from backend.collectors.usage import collect_usage
 from backend.models import Dispatcher, InstanceOverview, Overview, PanelError
 from backend.transport import make_runner
 
@@ -58,6 +60,12 @@ def build_instance(instance, runner_factory=make_runner) -> InstanceOverview:
     rl = guard("reliability", lambda: collect_reliability(runner, instance))
     if rl is not None:
         io.reliability = rl
+    us = guard("usage", lambda: collect_usage(runner, instance))
+    if us is not None:
+        io.usage = us
+    se = guard("sessions", lambda: collect_sessions(runner, instance))
+    if se is not None:
+        io.sessions = se
     return io
 
 
