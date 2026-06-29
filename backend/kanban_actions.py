@@ -64,6 +64,23 @@ def read_board(runner, instance) -> list[dict]:
     return _parse_tasks(r.stdout if r.ok else "")
 
 
+def read_assignees(runner, instance) -> list[str]:
+    """Valid assignee profiles for the board, via `kanban assignees --json`. These are the
+    profiles a task can be handed to — not just the instance's own connect-profile."""
+    r = runner.run(["kanban", "assignees", "--json"], timeout=10)
+    if not r.ok:
+        return []
+    try:
+        data = json.loads(r.stdout or "[]")
+    except Exception:
+        return []
+    return [
+        str(a["name"])
+        for a in (data if isinstance(data, list) else [])
+        if isinstance(a, dict) and a.get("name") and a.get("on_disk", True)
+    ]
+
+
 def read_task(runner, instance, task_id: str) -> Optional[dict]:
     r = runner.run(["kanban", "show", task_id, "--json"], timeout=12)
     if not r.ok:

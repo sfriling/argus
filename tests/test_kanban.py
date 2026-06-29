@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from backend.app import create_app
 from backend.config import AppConfig, Instance, actions_writable
-from backend.kanban_actions import ActionError, verb_to_argv, read_board
+from backend.kanban_actions import ActionError, verb_to_argv, read_board, read_assignees
 from backend.models import Overview
 from backend.transport import RunResult
 
@@ -73,6 +73,20 @@ def test_read_board_parses_list():
 
 def test_read_board_bad_json_is_empty():
     assert read_board(_Runner(RunResult(ok=True, stdout="nonsense")), None) == []
+
+
+def test_read_assignees_returns_profile_names():
+    data = [
+        {"name": "executor", "on_disk": True, "counts": {}},
+        {"name": "planner", "on_disk": True, "counts": {}},
+        {"name": "ghost", "on_disk": False, "counts": {}},   # not on disk → excluded
+    ]
+    names = read_assignees(_Runner(RunResult(ok=True, stdout=json.dumps(data))), None)
+    assert names == ["executor", "planner"]
+
+
+def test_read_assignees_failure_is_empty():
+    assert read_assignees(_Runner(RunResult(ok=False)), None) == []
 
 
 # --- endpoints ---------------------------------------------------------------

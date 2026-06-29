@@ -81,13 +81,16 @@ def create_app(config=None, aggregator=None) -> FastAPI:
         inst = _instance_or_404(instance)
         runner = make_runner(inst)
         tasks = kanban_actions.read_board(runner, inst)
+        profiles = kanban_actions.read_assignees(runner, inst) or (
+            [inst.profile] if inst.profile else []
+        )
         return {
             "tasks": tasks,
             "meta": {
                 "instance": instance,
                 "writable": actions_writable(agg.config, bind_host),
                 "actions_enabled": agg.config.enable_actions,
-                "profiles": inst.profile and [inst.profile] or [],
+                "profiles": profiles,
             },
         }
 
