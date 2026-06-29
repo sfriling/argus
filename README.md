@@ -49,11 +49,12 @@ A **Summary** landing page plus four tabs keep it calm:
 | **Board** | An interactive kanban board per instance, backed by the `hermes kanban` CLI: drag cards between valid columns, add tasks, comment, assign, archive. **Read-only unless `enable_actions`** is set (see [security](#write-actions--security-model)). |
 | **Fleet** | Per-instance gateway/dispatcher health, active profile & profile list, and crons (name · schedule · next run · last status). |
 | **Agents** | This machine’s **Claude Code** background agents (read from `~/.claude`): active ones pinned on top, recent below. Hidden if you don’t run Claude Code. |
-| **Insights** | Usage over 7 days (sessions · tool calls · token totals · per-model bars · top tools — tokens, not dollars), recent sessions (**click one for a transcript drill-down**), and the **reliability-guard** tally.¹ |
+| **Insights** | Usage over 7 days (sessions · tool calls · token totals · per-model bars · top tools — tokens, not dollars), recent sessions (**click one for a transcript drill-down**), and a **reliability** tally.¹ |
 
-¹ The reliability tally reads a custom `hermes-reliability-guard` plugin's trajectory log. If you
-don't run that plugin, the panel shows a short "not installed" note instead — everything else
-works without it.
+¹ The reliability tally is **opt-in by data**: it reads a tool-execution guard's trajectory log
+(JSONL) at `<hermes_home>/reliability/trajectories.jsonl`. If nothing is writing that file, the
+panel and its Summary tiles simply don't appear — so it's hidden by default and only shows up if
+you run a guard that records there. (Override the path per-instance with `reliability_log`.)
 
 Everything is fed by a single polled snapshot, so the whole board reflects one consistent moment.
 

@@ -72,7 +72,7 @@ function TallyCard({
 }
 
 function InstanceReliability({ instance }: { instance: InstanceOverview }) {
-  const { configured, today, recent } = instance.reliability;
+  const { today, recent } = instance.reliability;
 
   return (
     <div
@@ -98,14 +98,6 @@ function InstanceReliability({ instance }: { instance: InstanceOverview }) {
         </span>
       </div>
 
-      {!configured ? (
-        <p className="text-sm rounded-lg p-3" style={{ background: '#0a0a0b', color: '#71717a' }}>
-          No reliability data. This panel reads the{' '}
-          <code style={{ color: '#a1a1aa' }}>hermes-reliability-guard</code> plugin's trajectory
-          log — install &amp; enable the guard on this instance to populate it.
-        </p>
-      ) : (
-      <>
       <TallyCard catches={today.catches} loop_breaks={today.loop_breaks} />
 
       {/* Recent entries */}
@@ -142,8 +134,6 @@ function InstanceReliability({ instance }: { instance: InstanceOverview }) {
           </div>
         </div>
       )}
-      </>
-      )}
     </div>
   );
 }
@@ -153,6 +143,11 @@ type ReliabilityPanelProps = {
 };
 
 export function ReliabilityPanel({ instances }: ReliabilityPanelProps) {
+  // Only instances that actually have reliability data (a trajectory log) show here.
+  // With none, the panel is hidden entirely — no dead-end for users not running a guard.
+  const shown = instances.filter((i) => i.reliability?.configured);
+  if (shown.length === 0) return null;
+
   return (
     <div>
       <h2
@@ -162,7 +157,7 @@ export function ReliabilityPanel({ instances }: ReliabilityPanelProps) {
         Reliability
       </h2>
       <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
-        {instances.map((inst) => (
+        {shown.map((inst) => (
           <InstanceReliability key={inst.name} instance={inst} />
         ))}
       </div>

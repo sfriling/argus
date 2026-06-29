@@ -48,13 +48,12 @@ describe('ReliabilityPanel', () => {
     expect(screen.getAllByText('Today').length).toBeGreaterThan(0);
   });
 
-  it('shows a guide instead of 0/0 when the guard plugin is not installed', () => {
+  it('renders nothing when no instance has reliability data', () => {
     const unconfigured = sampleOverview.instances.map((i) => ({
       ...i,
       reliability: { configured: false, today: { catches: 0, loop_breaks: 0 }, recent: [] },
     }));
-    render(<ReliabilityPanel instances={unconfigured} />);
-    expect(screen.getAllByText(/hermes-reliability-guard/).length).toBeGreaterThan(0);
-    expect(screen.queryByText('catches')).not.toBeInTheDocument();
+    const { container } = render(<ReliabilityPanel instances={unconfigured} />);
+    expect(container).toBeEmptyDOMElement();        // hidden entirely — no dead-end hint
   });
 });

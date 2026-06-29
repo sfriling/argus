@@ -132,6 +132,7 @@ export function SummaryView({
   const firstTask = instances.flatMap((i) => i.kanban?.in_flight ?? [])[0];
   const cron = nextCron(overview);
 
+  const hasReliability = instances.some((i) => i.reliability?.configured);
   const catches = instances.reduce((n, i) => n + (i.reliability?.today?.catches ?? 0), 0);
   const breaks = instances.reduce((n, i) => n + (i.reliability?.today?.loop_breaks ?? 0), 0);
   const tokens = instances.reduce((n, i) => n + (i.usage?.total_tokens ?? 0), 0);
@@ -177,8 +178,8 @@ export function SummaryView({
       <div>
         <SectionLabel>Today</SectionLabel>
         <div className="flex flex-wrap gap-3">
-          <StatTile value={String(catches)} label="catches" />
-          <StatTile value={String(breaks)} label="loop-breaks" />
+          {hasReliability && <StatTile value={String(catches)} label="catches" />}
+          {hasReliability && <StatTile value={String(breaks)} label="loop-breaks" />}
           <StatTile value={formatTokens(tokens)} label="tokens · 7d" />
           <StatTile value={String(sessions)} label="sessions · 7d" />
         </div>
