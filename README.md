@@ -33,30 +33,43 @@ self-host). It can also surface your local **Claude Code** background agents in 
 
 ## Setup
 
-One command (creates `config.yaml`, a venv, installs deps, builds the UI):
+One command (venv, installs the `argus` command, builds the UI):
 ```bash
 ./scripts/setup.sh        # Linux/macOS
 .\scripts\setup.ps1       # Windows (PowerShell)
 ```
-Then edit `config.yaml` to point at your instances and run:
+Then create a config and run:
 ```bash
-.venv/bin/python -m uvicorn backend.app:create_app --factory --port 7700   # .venv\Scripts\python on Windows
-# open http://localhost:7700
+argus config init         # writes a starter config to the standard location
+argus config path         # show where it lives, then edit it (or use `argus instance add`)
+argus serve               # open http://localhost:7700
 ```
 
 <details><summary>Manual setup (what the script does)</summary>
 
 ```bash
-cp config.example.yaml config.yaml                      # 1. configure instances
-python -m venv .venv                                    # 2. backend deps
-.venv/Scripts/pip install -r backend/requirements.txt   #    (bin/pip on *nix)
-cd frontend && npm install && npm run build && cd ..    # 3. build the UI
-.venv/Scripts/python -m uvicorn backend.app:create_app --factory --port 7700   # 4. run
+python -m venv .venv
+.venv/Scripts/pip install -e .                          # installs deps + the `argus` command
+cd frontend && npm install && npm run build && cd ..    # build the UI
+.venv/Scripts/argus config init && .venv/Scripts/argus serve
 ```
 </details>
 
-`config.yaml` lists each instance: a `local` transport runs `hermes` directly; an `ssh`
-transport runs the same calls over an SSH key. See `config.example.yaml`.
+## Configuration
+
+Config is a single YAML file, managed three ways — pick whichever you like:
+
+- **File** — edit it directly. Location precedence: `$ARGUS_CONFIG` → a repo-local
+  `./config.yaml` (handy for dev) → the standard user dir
+  (`%APPDATA%\Argus\config.yaml` on Windows, `~/.config/argus/config.yaml` elsewhere).
+- **CLI** — `argus config init|path|show`, `argus instance add|remove|list`,
+  `argus doctor` (validates config + probes each instance), `argus serve [--host --port --config]`.
+- **Settings UI** — the gear in the header. Read-only by default; set
+  `enable_config_writes: true` (and keep Argus bound to localhost) to add/edit instances
+  and change port/refresh from the browser, with a confirm step before each write.
+
+Each instance: a `local` transport runs `hermes` directly; an `ssh` transport runs the same
+calls over an SSH key. See `config.example.yaml`.
 
 ### Run on login (optional)
 `run-argus.cmd` launches Argus hidden and logs to `%LOCALAPPDATA%\argus.log`. To start it
@@ -69,6 +82,7 @@ On Linux, run it under a systemd **user** service or your process manager of cho
 
 ## Develop
 - Backend tests: `.venv/Scripts/python -m pytest -q`
+- Run the server: `argus serve` (or `.venv/Scripts/argus serve`)
 - Frontend dev (hot reload, proxies `/api` to :7700): `cd frontend && npm run dev`
 - Frontend tests: `cd frontend && npm run test`
 
@@ -77,6 +91,11 @@ FastAPI backend aggregates each instance via a `Runner` transport (local subproc
 normalizes everything to one pydantic contract, and serves `GET /api/overview` plus the built
 React (Vite + Tailwind) SPA. Collectors fail independently — an offline instance degrades to a
 single card, never a broken page. A short TTL cache keeps polling from hammering SSH.
+
+`backend/settings.py` is the config core (load/validate/locate/atomic-write); the CLI
+(`backend/cli.py`) and the Settings UI both go through it. Config writes are exposed at
+`PUT /api/config` only when `enable_config_writes` is set **and** the server is bound to
+localhost — otherwise the dashboard stays fully read-only.
 
 See `docs/DESIGN.md` and `docs/PLAN.md`.
 
