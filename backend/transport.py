@@ -21,11 +21,18 @@ class Runner(Protocol):
     def list_dir(self, path: str, timeout: int = 8) -> list[str]: ...
 
 
+# On Windows, when the server runs under pythonw (no console of its own), each
+# console-subsystem child (hermes.exe, ssh.exe) would otherwise pop a NEW terminal
+# window. CREATE_NO_WINDOW suppresses that. No-op / absent on POSIX.
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
 def _exec(cmd: list[str], timeout: int) -> RunResult:
     try:
         p = subprocess.run(
             cmd, capture_output=True, text=True,
             encoding="utf-8", errors="replace", timeout=timeout,
+            stdin=subprocess.DEVNULL, creationflags=_NO_WINDOW,
         )
         return RunResult(ok=(p.returncode == 0), stdout=p.stdout or "", stderr=p.stderr or "")
     except Exception as e:  # timeout, missing binary, etc. — never raise into a collector
