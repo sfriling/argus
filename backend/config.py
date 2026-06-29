@@ -4,6 +4,7 @@ from __future__ import annotations
 from backend.settings import (  # noqa: F401
     AppConfig,
     Instance,
+    actions_writable,
     config_writable,
     default_config,
     is_localhost,

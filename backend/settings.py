@@ -42,6 +42,7 @@ class AppConfig(BaseModel):
     refresh_seconds: int = 5
     claude_home: str = "~/.claude"      # local Claude Code home; "" disables that panel
     enable_config_writes: bool = False  # gate for the Settings-UI write endpoints
+    enable_actions: bool = False        # gate for kanban (and future) write actions
     instances: list[Instance] = Field(default_factory=list)
 
     @property
@@ -139,6 +140,13 @@ def config_writable(config: AppConfig, bind_host: Optional[str] = None) -> bool:
     bound to localhost. `bind_host` is the actual bound host (falls back to config.host)."""
     host = bind_host if bind_host is not None else config.host
     return bool(config.enable_config_writes) and is_localhost(host)
+
+
+def actions_writable(config: AppConfig, bind_host: Optional[str] = None) -> bool:
+    """Kanban (and future) write actions are allowed only when explicitly enabled AND the
+    server is bound to localhost. Separate from config writes so they switch independently."""
+    host = bind_host if bind_host is not None else config.host
+    return bool(config.enable_actions) and is_localhost(host)
 
 
 # backward-compatible alias (older callers/tests import load_config)

@@ -1,9 +1,10 @@
-export type TabKey = 'summary' | 'fleet' | 'agents' | 'insights';
+export type TabKey = 'summary' | 'board' | 'fleet' | 'agents' | 'insights';
 
 export type TabDef = { key: TabKey; label: string; icon: string };
 
 export const TABS: TabDef[] = [
   { key: 'summary', label: 'Summary', icon: '◳' },
+  { key: 'board', label: 'Board', icon: '▦' },
   { key: 'fleet', label: 'Fleet', icon: '⊞' },
   { key: 'agents', label: 'Agents', icon: '◆' },
   { key: 'insights', label: 'Insights', icon: '▤' },

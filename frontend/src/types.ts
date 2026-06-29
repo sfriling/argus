@@ -134,3 +134,28 @@ export type ConfigResponse = {
   config: ArgusConfig;
   meta: ConfigMeta;
 };
+
+export type BoardTask = {
+  id: string;
+  title: string;
+  status: string;
+  assignee?: string | null;
+  body?: string | null;
+  priority?: number;
+  created_at?: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+  result?: string | null;
+};
+
+export type BoardMeta = {
+  instance: string;
+  writable: boolean;
+  actions_enabled: boolean;
+  profiles: string[];
+};
+
+export type BoardResponse = {
+  tasks: BoardTask[];
+  meta: BoardMeta;
+};

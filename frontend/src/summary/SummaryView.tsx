@@ -163,7 +163,7 @@ export function SummaryView({
             title="Kanban"
             big={`${kanbanInFlight} in flight`}
             sub={firstTask?.title}
-            onClick={() => onNavigate('agents')}
+            onClick={() => onNavigate('board')}
           />
           <LiveCard
             title="Crons"

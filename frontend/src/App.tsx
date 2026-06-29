@@ -3,9 +3,9 @@ import { useOverview } from './useOverview';
 import { SettingsModal } from './settings/SettingsModal';
 import { Tabs, type TabKey } from './nav/Tabs';
 import { SummaryView } from './summary/SummaryView';
+import { BoardTab } from './board/BoardTab';
 import { FleetPanel } from './panels/FleetPanel';
 import { ClaudeAgentsPanel } from './panels/ClaudeAgentsPanel';
-import { DelegationPanel } from './panels/DelegationPanel';
 import { CronsPanel } from './panels/CronsPanel';
 import { ReliabilityPanel } from './panels/ReliabilityPanel';
 import { UsagePanel } from './panels/UsagePanel';
@@ -125,6 +125,7 @@ export default function App() {
 
       <main className="px-4 sm:px-6 py-8 max-w-6xl mx-auto space-y-10">
         {tab === 'summary' && <SummaryView overview={data} onNavigate={setTab} />}
+        {tab === 'board' && <BoardTab instances={instances.map((i) => i.name)} />}
         {tab === 'fleet' && (
           <>
             <FleetPanel instances={instances} />
@@ -132,12 +133,7 @@ export default function App() {
             <ProfilesPanel instances={instances} />
           </>
         )}
-        {tab === 'agents' && (
-          <>
-            <ClaudeAgentsPanel agents={claudeAgents} />
-            <DelegationPanel instances={instances} />
-          </>
-        )}
+        {tab === 'agents' && <ClaudeAgentsPanel agents={claudeAgents} />}
         {tab === 'insights' && (
           <>
             <UsagePanel instances={instances} />

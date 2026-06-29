@@ -9,7 +9,16 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.aggregator import Aggregator
 from backend import settings
-from backend.settings import AppConfig, config_writable, resolve_config_path, save, validate
+from backend.settings import (
+    AppConfig,
+    actions_writable,
+    config_writable,
+    resolve_config_path,
+    save,
+    validate,
+)
+from backend import kanban_actions
+from backend.transport import make_runner
 
 
 def _effective_bind_host(config: AppConfig) -> str:
@@ -60,6 +69,57 @@ def create_app(config=None, aggregator=None) -> FastAPI:
         save(new_cfg)
         agg.replace_config(new_cfg)
         return {"ok": True, "config": new_cfg.model_dump(exclude_none=True)}
+
+    def _instance_or_404(name: str):
+        for inst in agg.config.instances:
+            if inst.name == name:
+                return inst
+        raise HTTPException(status_code=404, detail=f"no instance named {name!r}")
+
+    @app.get("/api/kanban/{instance}/board")
+    def kanban_board(instance: str):
+        inst = _instance_or_404(instance)
+        runner = make_runner(inst)
+        tasks = kanban_actions.read_board(runner, inst)
+        return {
+            "tasks": tasks,
+            "meta": {
+                "instance": instance,
+                "writable": actions_writable(agg.config, bind_host),
+                "actions_enabled": agg.config.enable_actions,
+                "profiles": inst.profile and [inst.profile] or [],
+            },
+        }
+
+    @app.get("/api/kanban/{instance}/task/{task_id}")
+    def kanban_task(instance: str, task_id: str):
+        inst = _instance_or_404(instance)
+        task = kanban_actions.read_task(make_runner(inst), inst, task_id)
+        if task is None:
+            raise HTTPException(status_code=404, detail="task not found")
+        return task
+
+    @app.post("/api/kanban/{instance}/action")
+    def kanban_action(instance: str, body: dict):
+        inst = _instance_or_404(instance)
+        if not actions_writable(agg.config, bind_host):
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Actions are disabled. Set enable_actions: true and bind Argus to "
+                    "localhost to act on the board."
+                ),
+            )
+        verb = str(body.get("verb") or "")
+        task_id = body.get("task_id")
+        args = body.get("args") or {}
+        try:
+            r = kanban_actions.run_action(make_runner(inst), inst, verb, task_id, args)
+        except kanban_actions.ActionError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+        if not r.ok:
+            raise HTTPException(status_code=400, detail=(r.stderr or r.stdout or "action failed").strip()[:400])
+        return {"ok": True, "stdout": (r.stdout or "").strip()}
 
     dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
     if dist.exists():
