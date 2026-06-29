@@ -1,10 +1,20 @@
 # Argus — list every Hermes instance you want to watch.
+# This file is optional: `argus config init` writes one to the standard location
+# (%APPDATA%\Argus\config.yaml / ~/.config/argus/config.yaml). A repo-local
+# config.yaml (like this) takes precedence for development.
+
+host: 127.0.0.1     # bind address. Keep on localhost if enable_config_writes is true.
+port: 7700
 refresh_seconds: 5
 
 # Local Claude Code home for the "Claude Agents" panel (reads ~/.claude/jobs +
 # ~/.claude/sessions on the machine running Argus). Defaults to ~/.claude.
 # Set to "" to disable the panel.
 claude_home: "~/.claude"
+
+# Allow editing this config from the Settings UI. Disabled by default. When true,
+# Argus must be bound to localhost (host above) or the write endpoints stay 403.
+enable_config_writes: false
 
 instances:
   - name: local

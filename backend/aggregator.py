@@ -18,10 +18,11 @@ from backend.transport import LocalRunner, make_runner
 def _collect_claude(config) -> list:
     """Claude agents are a local-only, top-level source (read from ~/.claude).
     Guarded so a failure degrades to [] and never breaks the page."""
-    if not config.claude_home:
+    home = getattr(config, "claude_home_path", None) or config.claude_home
+    if not home:
         return []
     try:
-        return collect_claude_agents(LocalRunner(None), config.claude_home)
+        return collect_claude_agents(LocalRunner(None), home)
     except Exception:
         return []
 
@@ -109,3 +110,10 @@ class Aggregator:
         self._cache = build_overview(self.config, now_iso, self.runner_factory)
         self._ts = t
         return self._cache
+
+    def replace_config(self, new_config) -> None:
+        """Swap config (after a Settings-UI write) and invalidate the cache so the
+        next poll reflects the change. host/port changes still need a restart."""
+        self.config = new_config
+        self._cache = None
+        self._ts = 0.0

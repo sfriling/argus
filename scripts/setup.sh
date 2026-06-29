@@ -3,26 +3,21 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-echo "==> Argus setup"
-
-if [ ! -f config.yaml ]; then
-  cp config.example.yaml config.yaml
-  echo "  · created config.yaml from example — edit it to point at your instances"
-else
-  echo "  · config.yaml already exists, leaving it"
-fi
-
-echo "==> backend venv + deps"
+echo "==> backend venv + install (provides the 'argus' command)"
 python3 -m venv .venv
 .venv/bin/pip install --quiet --upgrade pip
-.venv/bin/pip install --quiet -r backend/requirements.txt
+.venv/bin/pip install --quiet -e .
 
 echo "==> frontend build"
 ( cd frontend && npm install --silent && npm run build )
 
 cat <<'EOF'
 
-✓ Setup complete. Edit config.yaml, then run:
-    .venv/bin/python -m uvicorn backend.app:create_app --factory --port 7700
-  and open http://localhost:7700
+Setup complete. Create a config and start Argus:
+    .venv/bin/argus config init      # writes a starter config to the standard location
+    .venv/bin/argus config path      # show where it lives, then edit it
+    .venv/bin/argus serve            # then open http://localhost:7700
+
+Tip: `.venv/bin/argus instance add --name vps --transport ssh ...` and
+     `.venv/bin/argus doctor` to validate your setup.
 EOF

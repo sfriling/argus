@@ -102,3 +102,35 @@ export type Overview = {
   instances: InstanceOverview[];
   claude_agents: ClaudeAgent[];
 };
+
+export type ConfigInstance = {
+  name: string;
+  transport: 'local' | 'ssh';
+  profile?: string;
+  hermes_home?: string;
+  hermes_bin?: string;
+  ssh?: string | null;
+  ssh_key?: string | null;
+  reliability_log?: string | null;
+};
+
+export type ArgusConfig = {
+  host: string;
+  port: number;
+  refresh_seconds: number;
+  claude_home: string;
+  enable_config_writes: boolean;
+  instances: ConfigInstance[];
+};
+
+export type ConfigMeta = {
+  path: string;
+  writable: boolean;
+  localhost_bound: boolean;
+  writes_enabled: boolean;
+};
+
+export type ConfigResponse = {
+  config: ArgusConfig;
+  meta: ConfigMeta;
+};

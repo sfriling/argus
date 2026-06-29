@@ -36,4 +36,7 @@ class FakeRunner:
 
 
 def make_instance(name="local", transport="local", home="/home/x/.hermes"):
-    return Instance(name=name, transport=transport, hermes_home=home, hermes_bin="hermes")
+    extra = {}
+    if transport == "ssh":
+        extra = {"ssh": "user@host", "ssh_key": "/k"}
+    return Instance(name=name, transport=transport, hermes_home=home, hermes_bin="hermes", **extra)

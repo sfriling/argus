@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { useOverview } from './useOverview';
+import { SettingsModal } from './settings/SettingsModal';
 import { FleetPanel } from './panels/FleetPanel';
 import { ClaudeAgentsPanel } from './panels/ClaudeAgentsPanel';
 import { DelegationPanel } from './panels/DelegationPanel';
@@ -19,9 +21,11 @@ function formatSecondsAgo(date: Date | null): string {
 function Header({
   stale,
   lastUpdated,
+  onOpenSettings,
 }: {
   stale: boolean;
   lastUpdated: Date | null;
+  onOpenSettings: () => void;
 }) {
   return (
     <header
@@ -63,6 +67,15 @@ function Header({
         <span className="text-xs" style={{ color: '#52525b' }}>
           {stale ? 'stale · ' : ''}updated {formatSecondsAgo(lastUpdated)}
         </span>
+        <button
+          onClick={onOpenSettings}
+          aria-label="Settings"
+          title="Settings"
+          className="ml-2 text-base leading-none px-1.5 py-1 rounded hover:opacity-100"
+          style={{ color: '#71717a', opacity: 0.8 }}
+        >
+          ⚙
+        </button>
       </div>
     </header>
   );
@@ -89,6 +102,7 @@ function LoadingScreen() {
 
 export default function App() {
   const { data, stale, lastUpdated } = useOverview();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   if (!data) return <LoadingScreen />;
 
@@ -97,7 +111,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen" style={{ background: '#0a0a0b' }}>
-      <Header stale={stale} lastUpdated={lastUpdated} />
+      <Header stale={stale} lastUpdated={lastUpdated} onOpenSettings={() => setSettingsOpen(true)} />
+      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       <main className="px-4 sm:px-6 py-8 max-w-6xl mx-auto space-y-10">
         <FleetPanel instances={instances} />

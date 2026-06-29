@@ -2,19 +2,10 @@
 $ErrorActionPreference = 'Stop'
 Set-Location (Join-Path $PSScriptRoot '..')
 
-Write-Host "==> Argus setup"
-
-if (-not (Test-Path config.yaml)) {
-    Copy-Item config.example.yaml config.yaml
-    Write-Host "  - created config.yaml from example - edit it to point at your instances"
-} else {
-    Write-Host "  - config.yaml already exists, leaving it"
-}
-
-Write-Host "==> backend venv + deps"
+Write-Host "==> backend venv + install (provides the 'argus' command)"
 python -m venv .venv
 .\.venv\Scripts\pip install --quiet --upgrade pip
-.\.venv\Scripts\pip install --quiet -r backend\requirements.txt
+.\.venv\Scripts\pip install --quiet -e .
 
 Write-Host "==> frontend build"
 Push-Location frontend
@@ -23,6 +14,10 @@ npm run build
 Pop-Location
 
 Write-Host ""
-Write-Host "Setup complete. Edit config.yaml, then run:"
-Write-Host "    .\.venv\Scripts\python -m uvicorn backend.app:create_app --factory --port 7700"
-Write-Host "  and open http://localhost:7700"
+Write-Host "Setup complete. Create a config and start Argus:"
+Write-Host "    .\.venv\Scripts\argus config init      # writes a starter config to the standard location"
+Write-Host "    .\.venv\Scripts\argus config path      # show where it lives, then edit it"
+Write-Host "    .\.venv\Scripts\argus serve            # then open http://localhost:7700"
+Write-Host ""
+Write-Host "Tip: '.\.venv\Scripts\argus instance add --name vps --transport ssh ...' and"
+Write-Host "     '.\.venv\Scripts\argus doctor' to validate your setup."
