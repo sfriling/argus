@@ -1,18 +1,13 @@
 import type { Overview, InstanceOverview } from '../types';
 import type { TabKey } from '../nav/Tabs';
-import { Card, StatusDot, STATUS, type StatusLevel } from '../ui/Card';
+import { Card, StatusDot, STATUS } from '../ui/Card';
+import { instanceLevel } from '../lib/status';
 import { deriveAlerts } from './alerts';
 
 function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return String(n);
-}
-
-function instanceLevel(inst: InstanceOverview): StatusLevel {
-  if (!inst.reachable) return 'down';
-  if (!inst.gateway?.up || !inst.dispatcher?.running) return 'warn';
-  return 'ok';
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {

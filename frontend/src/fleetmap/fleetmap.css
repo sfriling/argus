@@ -1,0 +1,37 @@
+/* Fleet Map animations — pure CSS, no dependency. */
+
+@keyframes fleet-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.12); }
+}
+
+@keyframes fleet-orbit {
+  to { transform: rotate(360deg); }
+}
+
+/* A busy agent node "breathes". transform-box keeps scale centered on the node. */
+.fleet-agent--busy {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: fleet-pulse 1.8s ease-in-out infinite;
+}
+
+/* Task tokens slowly orbit their hub. transform-origin is set inline to the hub centre. */
+.fleet-orbit {
+  transform-box: view-box;
+  animation: fleet-orbit 18s linear infinite;
+}
+
+/* A blocked agent gets a steady amber halo (no motion needed). */
+.fleet-agent--blocked { filter: drop-shadow(0 0 6px #f59e0baa); }
+
+/* Stale snapshot: desaturate the whole scene and freeze all motion. */
+.fleet--stale { filter: saturate(0.35); }
+.fleet--stale .fleet-agent--busy,
+.fleet--stale .fleet-orbit { animation: none; }
+
+/* Respect the user's motion preference — no continuous animation. */
+@media (prefers-reduced-motion: reduce) {
+  .fleet-agent--busy,
+  .fleet-orbit { animation: none; }
+}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { useOverview } from './useOverview';
 import { SettingsModal } from './settings/SettingsModal';
 import { Tabs, type TabKey } from './nav/Tabs';
@@ -11,6 +11,8 @@ import { ReliabilityPanel } from './panels/ReliabilityPanel';
 import { UsagePanel } from './panels/UsagePanel';
 import { SessionsPanel } from './panels/SessionsPanel';
 import { ProfilesPanel } from './panels/ProfilesPanel';
+
+const FleetMap = lazy(() => import('./fleetmap/FleetMap'));
 
 function formatSecondsAgo(date: Date | null): string {
   if (!date) return '—';
@@ -125,6 +127,11 @@ export default function App() {
 
       <main className="px-4 sm:px-6 py-8 max-w-6xl mx-auto space-y-10">
         {tab === 'summary' && <SummaryView overview={data} onNavigate={setTab} />}
+        {tab === 'map' && (
+          <Suspense fallback={<p className="text-sm" style={{ color: '#52525b' }}>Loading map…</p>}>
+            <FleetMap overview={data} stale={stale} onNavigate={setTab} />
+          </Suspense>
+        )}
         {tab === 'board' && <BoardTab instances={instances.map((i) => i.name)} />}
         {tab === 'fleet' && (
           <>
