@@ -50,6 +50,13 @@ A **Summary** landing page plus four tabs keep it calm:
 | **Fleet** | Per-instance gateway/dispatcher health, active profile & profile list, and crons (name · schedule · next run · last status). |
 | **Agents** | This machine’s **Claude Code** background agents (read from `~/.claude`): active ones pinned on top, recent below. Hidden if you don’t run Claude Code. |
 | **Insights** | Usage over 7 days (sessions · tool calls · token totals · per-model bars · top tools — tokens, not dollars), recent sessions (**click one for a transcript drill-down**), and a **reliability** tally.¹ |
+| **Map** | An optional animated SVG "fleet" view of the same snapshot — hubs per instance, agents pulsing as they work, task tokens in flight. Lazy-loaded; respects `prefers-reduced-motion`. |
+| **Review** | *Opt-in, hidden unless enabled.* A **Claude-powered skill review**: triages the sessions that struggled, reviews them against your skills, and proposes gaps / health fixes / concrete edits. **Propose-only** (read-only). See below. |
+
+The **Review** tab is off by default and invisible unless `enable_skill_review: true`, Argus is
+bound to localhost, and an `ANTHROPIC_API_KEY` is set (env preferred). Install its optional
+dependency with `pip install -e .[review]`. Everyone else pays nothing — no tab, no `anthropic`
+dependency, no API calls.
 
 ¹ The reliability tally is **opt-in by data**: it reads a tool-execution guard's trajectory log
 (JSONL) at `<hermes_home>/reliability/trajectories.jsonl`. If nothing is writing that file, the
