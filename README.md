@@ -13,19 +13,18 @@ It does this without any agent-side install: it just runs the `hermes` CLI and r
 files — locally and over SSH — and never changes anything (read-only by design, safe to
 self-host). It can also surface your local **Claude Code** background agents in the same pane.
 
-## Panels
-- **Fleet** — per-instance gateway/dispatcher health, active profile, tasks in flight.
-- **Claude Agents** — this desktop's Claude Code background agents (read from `~/.claude`):
-  active ones pinned up top (name · current task · model · tokens · cwd · live state),
-  recent/completed below. Hidden if you don't run Claude Code.
-- **Delegation** — kanban status counts + in-flight tasks per board.
-- **Crons** — name · schedule · next run · last status.
-- **Reliability Guard** — recent catches (inferred / rejected / loop-break) + today's tally.
-- **Usage** — sessions, tool calls, and token totals per instance over the last 7 days, with
-  per-model token bars and top tools. (Tokens, not dollars — Hermes meters tokens, and most
-  fleets mix subscriptions and credits.)
-- **Recent Sessions** — the latest sessions per instance, cron runs flagged.
-- **Profiles** — the profiles per instance, active highlighted.
+## Layout
+A **Summary** landing page plus three detail tabs keep it calm:
+
+- **Summary** — the at-a-glance: an attention strip ("all systems nominal" or what needs
+  you), per-instance health, **Live Now** (active Claude agents · kanban in-flight · next
+  cron), and **Today** tiles (catches · loop-breaks · tokens · sessions).
+- **Fleet** — per-instance gateway/dispatcher health & profiles, plus crons
+  (name · schedule · next run · last status).
+- **Agents** — this desktop's Claude Code background agents (read from `~/.claude`; active
+  pinned up top, recent below; hidden if you don't run Claude Code) and kanban **delegation**.
+- **Insights** — usage (sessions · tool calls · token totals over 7 days, per-model bars,
+  top tools — tokens not dollars), recent sessions, and the **reliability guard** tally.
 
 ## Requirements
 - Python 3.11+ and Node 20+ (build the UI once).
