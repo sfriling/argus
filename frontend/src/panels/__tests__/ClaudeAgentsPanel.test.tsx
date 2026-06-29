@@ -13,9 +13,9 @@ describe('ClaudeAgentsPanel', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows a "waiting" badge for a blocked+live agent', () => {
+  it('shows a "running" badge for a live, busy agent', () => {
     render(<ClaudeAgentsPanel agents={agents} />);
-    expect(screen.getByText('waiting')).toBeInTheDocument();
+    expect(screen.getByText('running')).toBeInTheDocument();
   });
 
   it('renders recent (done) agents under a Recent header', () => {

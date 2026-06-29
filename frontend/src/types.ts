@@ -65,6 +65,7 @@ export type ClaudeAgent = {
   created_at: string;
   updated_at: string;
   live: boolean;
+  busy: boolean;
   active: boolean;
 };
 

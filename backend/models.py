@@ -94,6 +94,7 @@ class ClaudeAgent(BaseModel):
     created_at: str = ""
     updated_at: str = ""
     live: bool = False      # a sessions/*.json entry exists for this job
+    busy: bool = False      # the live session is actively working (status == busy)
     active: bool = False    # grouping flag: pinned at top vs. recent history
 
 

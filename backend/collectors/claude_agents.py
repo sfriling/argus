@@ -95,7 +95,11 @@ def parse_claude_agents(job_entries, session_texts, now: datetime | None = None,
         tempo = str(j.get("tempo") or "")
         sess = live_by_job.get(str(jid)) or live_by_job.get(str(j.get("daemonShort") or ""))
         live = sess is not None
-        active = state != "done" and (tempo == "active" or live)
+        busy = bool(sess and str(sess.get("status") or "").lower() == "busy")
+        # A live session process means the agent is open/working RIGHT NOW — that wins over
+        # the job's lifecycle `state`, which can read "done" between turns while the session
+        # is still alive and busy. Fall back to tempo for jobs with no live session.
+        active = live or (state != "done" and tempo == "active")
 
         in_flight = 0
         infl = j.get("inFlight")
@@ -119,6 +123,7 @@ def parse_claude_agents(job_entries, session_texts, now: datetime | None = None,
             created_at=str(j.get("createdAt") or ""),
             updated_at=str(j.get("updatedAt") or ""),
             live=live,
+            busy=busy,
             active=active,
         ))
 

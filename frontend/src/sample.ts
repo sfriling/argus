@@ -14,6 +14,7 @@ const sampleClaudeAgents: ClaudeAgent[] = [
     created_at: '2026-06-28T11:35:22Z',
     updated_at: '2026-06-29T09:32:03Z',
     live: true,
+    busy: true,
     active: true,
   },
   {
@@ -29,6 +30,7 @@ const sampleClaudeAgents: ClaudeAgent[] = [
     created_at: '2026-06-27T10:00:00Z',
     updated_at: '2026-06-28T18:20:00Z',
     live: false,
+    busy: false,
     active: false,
   },
   {
@@ -44,6 +46,7 @@ const sampleClaudeAgents: ClaudeAgent[] = [
     created_at: '2026-06-26T09:00:00Z',
     updated_at: '2026-06-27T12:00:00Z',
     live: false,
+    busy: false,
     active: false,
   },
 ];

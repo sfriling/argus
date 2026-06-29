@@ -196,6 +196,17 @@ def test_claude_agents_active_first_and_live_join():
     assert agents[1].active is False and agents[1].live is False
 
 
+def test_claude_agents_live_busy_overrides_done_state():
+    # The bug: a job whose lifecycle state reads 'done' but whose session is still live+busy
+    # (between turns) must STILL count as active — a live process wins over the job state.
+    jobs = [_job("s1", "done", "active", "2026-06-29T09:00:00Z", name="working")]
+    sessions = [json.dumps({"pid": 1, "jobId": "s1", "sessionId": "x", "status": "busy"})]
+    a = parse_claude_agents(jobs, sessions, now=NOW)[0]
+    assert a.live is True
+    assert a.busy is True
+    assert a.active is True
+
+
 def test_claude_agents_model_and_tokens():
     jobs = [_job("a", "done", "idle", "2026-06-29T09:00:00Z", model="opus", tokens=None)]
     a = parse_claude_agents(jobs, [], now=NOW)[0]

@@ -27,8 +27,12 @@ function relTime(iso: string): string {
 
 function stateStyle(agent: ClaudeAgent): { label: string; color: string; bg: string } {
   const s = agent.state.toLowerCase();
+  // A live session reflects the real "now": busy = working, otherwise it's an open
+  // session waiting (on you or a tool). This wins over the job's `state`, which can read
+  // "done" between turns while the process is still alive.
+  if (agent.busy) return { label: 'running', color: '#22c55e', bg: '#22c55e18' };
+  if (agent.live) return { label: 'waiting', color: '#f59e0b', bg: '#f59e0b18' };
   if (s === 'blocked') return { label: 'waiting', color: '#f59e0b', bg: '#f59e0b18' };
-  if (agent.live && s !== 'done') return { label: 'running', color: '#22c55e', bg: '#22c55e18' };
   if (agent.active) return { label: 'active', color: '#3b82f6', bg: '#3b82f618' };
   if (s === 'done') return { label: 'done', color: '#71717a', bg: '#71717a18' };
   return { label: s || 'idle', color: '#a1a1aa', bg: '#a1a1aa18' };
