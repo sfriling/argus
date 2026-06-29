@@ -69,6 +69,34 @@ export type ClaudeAgent = {
   active: boolean;
 };
 
+export type SessionMeta = {
+  id: string;
+  title: string;
+  model: string;
+  message_count: number;
+  tool_call_count: number;
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number;
+  started_at: number | null;
+  ended_at: number | null;
+  end_reason: string;
+};
+
+export type SessionMessage = {
+  role: string;
+  text: string;
+  tools: string[];
+  tool_name: string;
+  result: string;
+  truncated: boolean;
+};
+
+export type SessionDetail = {
+  meta: SessionMeta;
+  messages: SessionMessage[];
+};
+
 export type PanelError = {
   panel: string;
   message: string;

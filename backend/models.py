@@ -98,6 +98,34 @@ class ClaudeAgent(BaseModel):
     active: bool = False    # grouping flag: pinned at top vs. recent history
 
 
+class SessionMeta(BaseModel):
+    id: str = ""
+    title: str = ""
+    model: str = ""
+    message_count: int = 0
+    tool_call_count: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cost_usd: float = 0.0
+    started_at: Optional[float] = None   # epoch seconds
+    ended_at: Optional[float] = None
+    end_reason: str = ""
+
+
+class SessionMessage(BaseModel):
+    role: str
+    text: str = ""              # user/assistant content
+    tools: list[str] = Field(default_factory=list)  # tools an assistant turn called
+    tool_name: str = ""         # the tool a 'tool' row is the result of
+    result: str = ""            # the tool result content (possibly truncated)
+    truncated: bool = False
+
+
+class SessionDetail(BaseModel):
+    meta: SessionMeta = Field(default_factory=SessionMeta)
+    messages: list[SessionMessage] = Field(default_factory=list)
+
+
 class PanelError(BaseModel):
     panel: str
     message: str

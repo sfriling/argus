@@ -1,9 +1,17 @@
+import { useState } from 'react';
 import type { InstanceOverview, SessionEntry } from '../types';
+import { SessionDrawer } from '../insights/SessionDrawer';
 
-function SessionRow({ session }: { session: SessionEntry }) {
+type Selected = { instance: string; id: string; title: string };
+
+function SessionRow({ session, onOpen }: { session: SessionEntry; onOpen: () => void }) {
   const isCron = session.id.startsWith('cron_');
   return (
-    <div className="rounded-lg px-3 py-2.5" style={{ background: '#0a0a0b' }}>
+    <div
+      onClick={onOpen}
+      className="rounded-lg px-3 py-2.5 cursor-pointer"
+      style={{ background: '#0a0a0b' }}
+    >
       <div className="flex items-center gap-2">
         {isCron && (
           <span
@@ -32,7 +40,13 @@ function SessionRow({ session }: { session: SessionEntry }) {
   );
 }
 
-function InstanceSessions({ instance }: { instance: InstanceOverview }) {
+function InstanceSessions({
+  instance,
+  onOpen,
+}: {
+  instance: InstanceOverview;
+  onOpen: (s: Selected) => void;
+}) {
   const sessions = instance.sessions;
   return (
     <div
@@ -55,7 +69,11 @@ function InstanceSessions({ instance }: { instance: InstanceOverview }) {
       ) : (
         <div className="p-3 space-y-1.5">
           {sessions.map((s) => (
-            <SessionRow key={s.id} session={s} />
+            <SessionRow
+              key={s.id}
+              session={s}
+              onOpen={() => onOpen({ instance: instance.name, id: s.id, title: s.title })}
+            />
           ))}
         </div>
       )}
@@ -68,6 +86,8 @@ type SessionsPanelProps = {
 };
 
 export function SessionsPanel({ instances }: SessionsPanelProps) {
+  const [selected, setSelected] = useState<Selected | null>(null);
+
   return (
     <div>
       <h2
@@ -78,9 +98,18 @@ export function SessionsPanel({ instances }: SessionsPanelProps) {
       </h2>
       <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
         {instances.map((inst) => (
-          <InstanceSessions key={inst.name} instance={inst} />
+          <InstanceSessions key={inst.name} instance={inst} onOpen={setSelected} />
         ))}
       </div>
+
+      {selected && (
+        <SessionDrawer
+          instance={selected.instance}
+          sessionId={selected.id}
+          title={selected.title}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </div>
   );
 }

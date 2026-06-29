@@ -18,6 +18,7 @@ from backend.settings import (
     validate,
 )
 from backend import kanban_actions
+from backend import session_detail
 from backend.transport import make_runner
 
 
@@ -75,6 +76,14 @@ def create_app(config=None, aggregator=None) -> FastAPI:
             if inst.name == name:
                 return inst
         raise HTTPException(status_code=404, detail=f"no instance named {name!r}")
+
+    @app.get("/api/sessions/{instance}/{session_id}")
+    def session_drilldown(instance: str, session_id: str):
+        inst = _instance_or_404(instance)
+        detail = session_detail.collect_session(make_runner(inst), inst, session_id)
+        if detail is None:
+            raise HTTPException(status_code=404, detail="session not found or not exportable")
+        return detail
 
     @app.get("/api/kanban/{instance}/board")
     def kanban_board(instance: str):
