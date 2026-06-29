@@ -1,5 +1,6 @@
 import json
 
+from backend.collectors.claude_agents import parse_claude_agents
 from backend.collectors.crons import parse_crons
 from backend.collectors.gateway import parse_gateway
 from backend.collectors.kanban import collect_kanban
@@ -164,3 +165,53 @@ def test_sessions_limit_and_empty():
     assert len(parse_sessions(SESSIONS, limit=1)) == 1
     assert parse_sessions("") == []
     assert parse_sessions(None) == []
+
+
+# --- Claude agents -----------------------------------------------------------
+from datetime import datetime, timezone
+
+
+def _job(short, state, tempo, updated, name="n", model="opus", tokens=100, sess="sid-" + "x"):
+    rf = ["--model", model] if model else []
+    return (short, json.dumps({
+        "daemonShort": short, "state": state, "tempo": tempo, "updatedAt": updated,
+        "createdAt": "2026-06-20T00:00:00Z", "name": name, "tokens": tokens,
+        "detail": "doing " + name, "cwd": "D:\\Projects\\X",
+        "sessionId": sess, "respawnFlags": rf, "inFlight": {"tasks": 1},
+    }))
+
+
+NOW = datetime(2026, 6, 29, 12, 0, 0, tzinfo=timezone.utc)
+
+
+def test_claude_agents_active_first_and_live_join():
+    jobs = [
+        _job("done1", "done", "idle", "2026-06-29T08:00:00Z", name="finished"),
+        _job("act1", "blocked", "active", "2026-06-29T09:00:00Z", name="running-now", sess="live-sid"),
+    ]
+    sessions = [json.dumps({"pid": 1, "jobId": "act1", "sessionId": "live-sid", "status": "busy"})]
+    agents = parse_claude_agents(jobs, sessions, now=NOW)
+    assert [a.id for a in agents] == ["act1", "done1"]  # active pinned first
+    assert agents[0].active is True and agents[0].live is True
+    assert agents[1].active is False and agents[1].live is False
+
+
+def test_claude_agents_model_and_tokens():
+    jobs = [_job("a", "done", "idle", "2026-06-29T09:00:00Z", model="opus", tokens=None)]
+    a = parse_claude_agents(jobs, [], now=NOW)[0]
+    assert a.model == "opus"
+    assert a.tokens == 0          # null tokens coerced to 0
+    assert a.in_flight == 1
+
+
+def test_claude_agents_done_window_filter():
+    jobs = [
+        _job("old", "done", "idle", "2026-06-10T00:00:00Z", name="stale"),   # 19 days old
+        _job("new", "done", "idle", "2026-06-28T00:00:00Z", name="fresh"),   # 1 day old
+    ]
+    ids = [a.id for a in parse_claude_agents(jobs, [], now=NOW, days=7)]
+    assert ids == ["new"]          # stale done agent dropped, fresh kept
+
+
+def test_claude_agents_empty():
+    assert parse_claude_agents([], [], now=NOW) == []

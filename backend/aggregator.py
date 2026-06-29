@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+from backend.collectors.claude_agents import collect_claude_agents
 from backend.collectors.crons import collect_crons
 from backend.collectors.gateway import collect_gateway, dispatcher_lock_path
 from backend.collectors.kanban import collect_kanban
@@ -11,7 +12,18 @@ from backend.collectors.reliability import collect_reliability
 from backend.collectors.sessions import collect_sessions
 from backend.collectors.usage import collect_usage
 from backend.models import Dispatcher, InstanceOverview, Overview, PanelError
-from backend.transport import make_runner
+from backend.transport import LocalRunner, make_runner
+
+
+def _collect_claude(config) -> list:
+    """Claude agents are a local-only, top-level source (read from ~/.claude).
+    Guarded so a failure degrades to [] and never breaks the page."""
+    if not config.claude_home:
+        return []
+    try:
+        return collect_claude_agents(LocalRunner(None), config.claude_home)
+    except Exception:
+        return []
 
 
 def build_instance(instance, runner_factory=make_runner) -> InstanceOverview:
@@ -71,11 +83,14 @@ def build_instance(instance, runner_factory=make_runner) -> InstanceOverview:
 
 def build_overview(config, now_iso: str, runner_factory=make_runner) -> Overview:
     instances = config.instances
+    claude_agents = _collect_claude(config)
     if not instances:
-        return Overview(generated_at=now_iso, refresh_seconds=config.refresh_seconds, instances=[])
+        return Overview(generated_at=now_iso, refresh_seconds=config.refresh_seconds,
+                        instances=[], claude_agents=claude_agents)
     with ThreadPoolExecutor(max_workers=max(2, len(instances))) as ex:
         results = list(ex.map(lambda inst: build_instance(inst, runner_factory), instances))
-    return Overview(generated_at=now_iso, refresh_seconds=config.refresh_seconds, instances=results)
+    return Overview(generated_at=now_iso, refresh_seconds=config.refresh_seconds,
+                    instances=results, claude_agents=claude_agents)
 
 
 class Aggregator:

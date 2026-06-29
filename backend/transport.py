@@ -66,6 +66,12 @@ class LocalRunner:
         except Exception:
             return []
 
+    def list_files(self, path: str, timeout: int = 8) -> list[str]:
+        try:
+            return sorted(p.name for p in Path(path).iterdir() if p.is_file())
+        except Exception:
+            return []
+
 
 class SshRunner:
     """Runs the same `hermes` calls and file reads over SSH (key-based, read-only)."""

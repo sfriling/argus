@@ -1,4 +1,52 @@
-import type { Overview, InstanceOverview } from './types';
+import type { Overview, InstanceOverview, ClaudeAgent } from './types';
+
+const sampleClaudeAgents: ClaudeAgent[] = [
+  {
+    id: '62b84259',
+    name: 'Improve Hermes agent task execution reliability',
+    task: 'Building the Claude Agents panel for Argus',
+    state: 'blocked',
+    model: 'opus',
+    tokens: 709_259,
+    in_flight: 0,
+    cwd: 'D:\\Projects\\ScratchPad',
+    session_id: '62b84259-c432-4a6c-904e-19f5df16e74a',
+    created_at: '2026-06-28T11:35:22Z',
+    updated_at: '2026-06-29T09:32:03Z',
+    live: true,
+    active: true,
+  },
+  {
+    id: '574bb2ac',
+    name: 'Demo new local build capabilities',
+    task: 'fix applied and shipped; app-1.6.2 deployed',
+    state: 'done',
+    model: 'opus',
+    tokens: 496_549,
+    in_flight: 0,
+    cwd: 'D:\\Projects\\Workspace',
+    session_id: '574bb2ac-ddbc-4a4a-ac5f-eac785327235',
+    created_at: '2026-06-27T10:00:00Z',
+    updated_at: '2026-06-28T18:20:00Z',
+    live: false,
+    active: false,
+  },
+  {
+    id: '10e163f6',
+    name: 'Upscaler',
+    task: 'Obsidian note written (Real-ESRGAN setup)',
+    state: 'done',
+    model: 'opus',
+    tokens: 38_782,
+    in_flight: 0,
+    cwd: 'D:\\Projects\\Upscale',
+    session_id: '10e163f6-aaaa-bbbb-cccc-ddddeeeeffff',
+    created_at: '2026-06-26T09:00:00Z',
+    updated_at: '2026-06-27T12:00:00Z',
+    live: false,
+    active: false,
+  },
+];
 
 const localInstance: InstanceOverview = {
   name: 'local',
@@ -193,6 +241,7 @@ export const sampleOverview: Overview = {
   generated_at: new Date().toISOString(),
   refresh_seconds: 5,
   instances: [localInstance, vpsInstance],
+  claude_agents: sampleClaudeAgents,
 };
 
 /** Degraded sample — vps unreachable */
@@ -208,4 +257,5 @@ export const sampleOverviewDegraded: Overview = {
   generated_at: new Date().toISOString(),
   refresh_seconds: 5,
   instances: [localInstance, vpsInstanceDegraded],
+  claude_agents: sampleClaudeAgents,
 };

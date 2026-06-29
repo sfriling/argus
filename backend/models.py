@@ -81,6 +81,22 @@ class Session(BaseModel):
     last_active: str = ""
 
 
+class ClaudeAgent(BaseModel):
+    id: str
+    name: str = ""
+    task: str = ""          # the job's current `detail`, truncated
+    state: str = ""         # raw state.json state: active | idle | blocked | done
+    model: str = ""
+    tokens: int = 0
+    in_flight: int = 0
+    cwd: str = ""
+    session_id: str = ""
+    created_at: str = ""
+    updated_at: str = ""
+    live: bool = False      # a sessions/*.json entry exists for this job
+    active: bool = False    # grouping flag: pinned at top vs. recent history
+
+
 class PanelError(BaseModel):
     panel: str
     message: str
@@ -107,3 +123,4 @@ class Overview(BaseModel):
     generated_at: str = ""
     refresh_seconds: int = 5
     instances: list[InstanceOverview] = Field(default_factory=list)
+    claude_agents: list[ClaudeAgent] = Field(default_factory=list)

@@ -1,5 +1,6 @@
 import { useOverview } from './useOverview';
 import { FleetPanel } from './panels/FleetPanel';
+import { ClaudeAgentsPanel } from './panels/ClaudeAgentsPanel';
 import { DelegationPanel } from './panels/DelegationPanel';
 import { CronsPanel } from './panels/CronsPanel';
 import { ReliabilityPanel } from './panels/ReliabilityPanel';
@@ -92,6 +93,7 @@ export default function App() {
   if (!data) return <LoadingScreen />;
 
   const { instances } = data;
+  const claudeAgents = data.claude_agents ?? [];
 
   return (
     <div className="min-h-screen" style={{ background: '#0a0a0b' }}>
@@ -99,6 +101,7 @@ export default function App() {
 
       <main className="px-4 sm:px-6 py-8 max-w-6xl mx-auto space-y-10">
         <FleetPanel instances={instances} />
+        <ClaudeAgentsPanel agents={claudeAgents} />
         <DelegationPanel instances={instances} />
         <CronsPanel instances={instances} />
         <ReliabilityPanel instances={instances} />

@@ -52,6 +52,22 @@ export type SessionEntry = {
   last_active: string;
 };
 
+export type ClaudeAgent = {
+  id: string;
+  name: string;
+  task: string;
+  state: string; // active | idle | blocked | done
+  model: string;
+  tokens: number;
+  in_flight: number;
+  cwd: string;
+  session_id: string;
+  created_at: string;
+  updated_at: string;
+  live: boolean;
+  active: boolean;
+};
+
 export type PanelError = {
   panel: string;
   message: string;
@@ -84,4 +100,5 @@ export type Overview = {
   generated_at: string;
   refresh_seconds: number;
   instances: InstanceOverview[];
+  claude_agents: ClaudeAgent[];
 };

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -23,6 +24,7 @@ class Instance:
 class AppConfig:
     refresh_seconds: int = 5
     instances: list[Instance] = field(default_factory=list)
+    claude_home: str = ""  # local ~/.claude for the Claude Agents panel; "" disables it
 
 
 def load_config(path: str = "config.yaml") -> AppConfig:
@@ -51,4 +53,11 @@ def load_config(path: str = "config.yaml") -> AppConfig:
             )
         )
 
-    return AppConfig(refresh_seconds=int(data.get("refresh_seconds", 5)), instances=instances)
+    raw_claude_home = data.get("claude_home", "~/.claude")
+    claude_home = os.path.expanduser(raw_claude_home) if raw_claude_home else ""
+
+    return AppConfig(
+        refresh_seconds=int(data.get("refresh_seconds", 5)),
+        instances=instances,
+        claude_home=claude_home,
+    )

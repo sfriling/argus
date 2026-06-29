@@ -1,6 +1,11 @@
 # Argus — list every Hermes instance you want to watch.
 refresh_seconds: 5
 
+# Local Claude Code home for the "Claude Agents" panel (reads ~/.claude/jobs +
+# ~/.claude/sessions on the machine running Argus). Defaults to ~/.claude.
+# Set to "" to disable the panel.
+claude_home: "~/.claude"
+
 instances:
   - name: local
     transport: local
