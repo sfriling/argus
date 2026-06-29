@@ -11,10 +11,13 @@ crons, and (if you run one) the reliability-guard activity.
 
 It does this without any agent-side install: it just runs the `hermes` CLI and reads state
 files — locally and over SSH — and never changes anything (read-only by design, safe to
-self-host).
+self-host). It can also surface your local **Claude Code** background agents in the same pane.
 
 ## Panels
 - **Fleet** — per-instance gateway/dispatcher health, active profile, tasks in flight.
+- **Claude Agents** — this desktop's Claude Code background agents (read from `~/.claude`):
+  active ones pinned up top (name · current task · model · tokens · cwd · live state),
+  recent/completed below. Hidden if you don't run Claude Code.
 - **Delegation** — kanban status counts + in-flight tasks per board.
 - **Crons** — name · schedule · next run · last status.
 - **Reliability Guard** — recent catches (inferred / rejected / loop-break) + today's tally.
