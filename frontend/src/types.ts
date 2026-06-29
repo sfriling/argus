@@ -117,6 +117,7 @@ export type InstanceOverview = {
   };
   crons: CronEntry[];
   reliability: {
+    configured: boolean;
     today: { catches: number; loop_breaks: number };
     recent: ReliabilityRecent[];
   };

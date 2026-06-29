@@ -80,6 +80,15 @@ def test_reliability_missing_file():
     assert parse_reliability(None).today.catches == 0
 
 
+def test_reliability_configured_flag():
+    # No file (None) → guard not installed → not configured.
+    assert parse_reliability(None).configured is False
+    # An empty file exists (guard installed, no events yet) → configured.
+    assert parse_reliability("").configured is True
+    # A file with events → configured.
+    assert parse_reliability('{"tool":"patch","field":"path","action":"inferred"}').configured is True
+
+
 # Trimmed copy of a real `hermes insights --days 7` box.
 INSIGHTS = """
   ╔══════════════════════════════════════════════════════════╗

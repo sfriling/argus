@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field, ValidationError, field_validator, model_v
 class Instance(BaseModel):
     name: str
     transport: str = "local"  # "local" | "ssh"
-    profile: str = "orchestrator"
+    profile: str = "default"  # Hermes's universal default profile; override per instance
     hermes_home: str = ""
     hermes_bin: str = "hermes"
     ssh: Optional[str] = None

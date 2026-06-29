@@ -27,12 +27,12 @@ enable_config_writes: false  # set true (and stay on localhost) to edit settings
 instances:
   - name: local
     transport: local
-    profile: orchestrator
+    profile: default        # your Hermes profile (run `hermes profile list`)
     hermes_home: "~/.hermes"
     hermes_bin: "hermes"
   # - name: vps
   #   transport: ssh
-  #   profile: orchestrator
+  #   profile: default
   #   ssh: "user@your.vps.ip"
   #   ssh_key: "~/.ssh/your_key"
   #   hermes_home: "/home/user/.hermes"
@@ -213,7 +213,7 @@ def build_parser() -> argparse.ArgumentParser:
     ia = isub.add_parser("add")
     ia.add_argument("--name", required=True)
     ia.add_argument("--transport", default="local", choices=["local", "ssh"])
-    ia.add_argument("--profile", default="orchestrator")
+    ia.add_argument("--profile", default="default")
     ia.add_argument("--hermes-home", dest="hermes_home")
     ia.add_argument("--hermes-bin", dest="hermes_bin")
     ia.add_argument("--ssh"); ia.add_argument("--ssh-key", dest="ssh_key")

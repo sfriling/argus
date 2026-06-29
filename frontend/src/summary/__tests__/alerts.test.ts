@@ -14,7 +14,7 @@ function inst(over: Partial<InstanceOverview> = {}): InstanceOverview {
     profiles: [],
     kanban: { counts: {}, in_flight: [] },
     crons: [],
-    reliability: { today: { catches: 0, loop_breaks: 0 }, recent: [] },
+    reliability: { configured: true, today: { catches: 0, loop_breaks: 0 }, recent: [] },
     usage: { days: 7, sessions: 0, messages: 0, tool_calls: 0, input_tokens: 0, output_tokens: 0, total_tokens: 0, active_time: '', models: [], top_tools: [] },
     sessions: [],
     panel_errors: [],
@@ -52,7 +52,7 @@ describe('deriveAlerts', () => {
   });
 
   it('warns on a loop-break today', () => {
-    const a = deriveAlerts(ov([inst({ reliability: { today: { catches: 0, loop_breaks: 1 }, recent: [] } })]));
+    const a = deriveAlerts(ov([inst({ reliability: { configured: true, today: { catches: 0, loop_breaks: 1 }, recent: [] } })]));
     expect(a.level).toBe('warn');
     expect(a.messages[0]).toMatch(/1 loop-break today/);
   });

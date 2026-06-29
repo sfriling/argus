@@ -32,7 +32,7 @@ describe('SummaryView', () => {
       instances: sampleOverview.instances.map((i) => ({
         ...i,
         kanban: { counts: {}, in_flight: [] },
-        reliability: { today: { catches: 0, loop_breaks: 0 }, recent: [] },
+        reliability: { configured: true, today: { catches: 0, loop_breaks: 0 }, recent: [] },
       })),
     };
     render(<SummaryView overview={clean} onNavigate={() => {}} />);

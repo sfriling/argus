@@ -13,8 +13,11 @@ def collect_reliability(runner, instance) -> Reliability:
 
 
 def parse_reliability(text: str | None) -> Reliability:
+    # text is None when the trajectory log doesn't exist → the guard plugin isn't installed.
+    # An empty string means the file exists but has no events yet (installed, quiet).
+    configured = text is not None
     if not text:
-        return Reliability()
+        return Reliability(configured=configured)
     events: list[dict] = []
     for line in [ln for ln in text.splitlines() if ln.strip()][-200:]:
         try:
@@ -36,6 +39,7 @@ def parse_reliability(text: str | None) -> Reliability:
         for e in events[-10:]
     ][::-1]
     return Reliability(
+        configured=True,
         today=ReliabilityToday(catches=catches, loop_breaks=loop_breaks),
         recent=recent,
     )

@@ -72,7 +72,7 @@ function TallyCard({
 }
 
 function InstanceReliability({ instance }: { instance: InstanceOverview }) {
-  const { today, recent } = instance.reliability;
+  const { configured, today, recent } = instance.reliability;
 
   return (
     <div
@@ -98,6 +98,14 @@ function InstanceReliability({ instance }: { instance: InstanceOverview }) {
         </span>
       </div>
 
+      {!configured ? (
+        <p className="text-sm rounded-lg p-3" style={{ background: '#0a0a0b', color: '#71717a' }}>
+          No reliability data. This panel reads the{' '}
+          <code style={{ color: '#a1a1aa' }}>hermes-reliability-guard</code> plugin's trajectory
+          log — install &amp; enable the guard on this instance to populate it.
+        </p>
+      ) : (
+      <>
       <TallyCard catches={today.catches} loop_breaks={today.loop_breaks} />
 
       {/* Recent entries */}
@@ -133,6 +141,8 @@ function InstanceReliability({ instance }: { instance: InstanceOverview }) {
             ))}
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

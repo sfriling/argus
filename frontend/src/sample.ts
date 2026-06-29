@@ -104,6 +104,7 @@ const localInstance: InstanceOverview = {
     },
   ],
   reliability: {
+    configured: true,
     today: { catches: 2, loop_breaks: 0 },
     recent: [
       {
@@ -197,6 +198,7 @@ const vpsInstance: InstanceOverview = {
     },
   ],
   reliability: {
+    configured: true,
     today: { catches: 0, loop_breaks: 1 },
     recent: [
       {

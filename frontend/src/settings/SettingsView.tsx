@@ -8,7 +8,7 @@ const LABEL = 'text-xs uppercase tracking-wider';
 const LABEL_STYLE = { color: '#52525b' };
 
 function blankInstance(): ConfigInstance {
-  return { name: '', transport: 'local', profile: 'orchestrator', hermes_home: '', hermes_bin: 'hermes' };
+  return { name: '', transport: 'local', profile: 'default', hermes_home: '', hermes_bin: 'hermes' };
 }
 
 type Props = {

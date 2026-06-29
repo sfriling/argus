@@ -46,6 +46,7 @@ class ReliabilityToday(BaseModel):
 
 
 class Reliability(BaseModel):
+    configured: bool = False   # the trajectory log exists (i.e. the guard plugin is installed)
     today: ReliabilityToday = Field(default_factory=ReliabilityToday)
     recent: list[ReliabilityEvent] = Field(default_factory=list)
 

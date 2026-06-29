@@ -23,13 +23,13 @@ enable_actions: false
 instances:
   - name: local
     transport: local
-    profile: orchestrator
+    profile: default          # your Hermes profile (see `hermes profile list`)
     hermes_home: "C:/Users/you/AppData/Local/hermes"
     hermes_bin: "C:/Users/you/AppData/Local/hermes/hermes-agent/venv/Scripts/hermes"
 
   - name: vps
     transport: ssh
-    profile: orchestrator
+    profile: default          # your Hermes profile (see `hermes profile list`)
     ssh: "user@your.vps.ip"
     ssh_key: "C:/Users/you/.ssh/your_key"
     hermes_home: "/home/user/.hermes"
