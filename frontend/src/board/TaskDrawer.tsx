@@ -41,7 +41,7 @@ export function TaskDrawer({
 }) {
   const [detail, setDetail] = useState<Record<string, unknown> | null>(null);
   const [comment, setComment] = useState('');
-  const [assignee, setAssignee] = useState(task.assignee ?? '');
+  const [assignee, setAssignee] = useState(''); // a target to (re)assign to — not the current one
   const [confirmArchive, setConfirmArchive] = useState(false);
 
   useEffect(() => {
@@ -117,13 +117,14 @@ export function TaskDrawer({
                 style={{ background: '#0a0a0b', borderColor: '#27272a', color: '#e4e4e7' }}
                 value={assignee} onChange={(e) => setAssignee(e.target.value)}
               >
-                <option value="">(assignee)</option>
+                <option value="">{task.assignee ? `reassign… (now @${task.assignee})` : '(assign to run…)'}</option>
                 {profiles.map((p) => <option key={p} value={p}>{p}</option>)}
               </select>
               <button
                 disabled={!assignee || assignee === task.assignee || busy}
                 onClick={() => onAction('assign', { assignee })}
-                className="text-sm px-3 py-1.5 rounded-md" style={{ color: '#a1a1aa', background: '#27272a' }}
+                className="text-sm px-3 py-1.5 rounded-md"
+                style={{ color: assignee ? '#0a0a0b' : '#52525b', background: assignee ? '#22c55e' : '#27272a' }}
               >Assign</button>
             </div>
 

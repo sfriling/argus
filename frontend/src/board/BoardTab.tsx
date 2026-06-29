@@ -192,8 +192,9 @@ export function BoardTab({ instances }: { instances: string[] }) {
           onClose={() => { setSelected(null); setActionError(null); }}
           onAction={async (verb, args) => {
             const ok = await act(verb, selected.id, args ?? {});
-            // close the drawer after a state transition (not after comment/assign)
-            if (ok && ['promote', 'block', 'unblock', 'complete', 'archive'].includes(verb)) {
+            // close the drawer after a state-changing action (assign releases-to-run);
+            // keep it open after a comment so you can add several.
+            if (ok && ['assign', 'promote', 'block', 'unblock', 'complete', 'archive'].includes(verb)) {
               setSelected(null);
             }
           }}
