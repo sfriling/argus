@@ -16,6 +16,10 @@ claude_home: "~/.claude"
 # Argus must be bound to localhost (host above) or the write endpoints stay 403.
 enable_config_writes: false
 
+# Allow Board write actions (create/move/comment/assign/archive tasks via the
+# hermes kanban CLI). Disabled by default; like above, requires a localhost bind.
+enable_actions: false
+
 instances:
   - name: local
     transport: local
