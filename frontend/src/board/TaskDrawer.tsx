@@ -59,7 +59,7 @@ export function TaskDrawer({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3">
-          <h2 className="text-sm font-semibold" style={{ color: '#f4f4f5' }}>{task.title}</h2>
+          <h2 className="text-sm font-semibold" style={{ color: '#f4f4f5', overflowWrap: 'anywhere' }}>{task.title}</h2>
           <button onClick={onClose} className="text-xs" style={{ color: '#a1a1aa' }}>Close</button>
         </div>
         <div className="flex items-center gap-2 text-xs" style={{ color: '#71717a' }}>

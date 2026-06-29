@@ -23,7 +23,7 @@ function TaskCard({
       className="rounded-lg px-3 py-2.5 cursor-pointer"
       style={{ background: '#111113', border: '1px solid #1f1f23' }}
     >
-      <p className="text-sm" style={{ color: '#f4f4f5' }}>{task.title}</p>
+      <p className="text-sm" style={{ color: '#f4f4f5', overflowWrap: 'anywhere' }}>{task.title}</p>
       <div className="flex items-center gap-2 mt-1.5 text-xs" style={{ color: '#52525b' }}>
         {task.assignee && <span className="font-mono">@{task.assignee}</span>}
         <span className="ml-auto" style={{ color: STATUS_COLOR[task.status] ?? '#52525b' }}>{task.status}</span>
