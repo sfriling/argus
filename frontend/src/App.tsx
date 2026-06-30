@@ -147,7 +147,12 @@ export default function App() {
           </>
         )}
         {tab === 'agents' && <ClaudeAgentsPanel agents={claudeAgents} />}
-        {tab === 'review' && <ReviewTab instances={instances.map((i) => i.name)} />}
+        {tab === 'review' && (
+          <ReviewTab
+            instances={instances.map((i) => i.name)}
+            writebackEnabled={!!data.features?.skill_writeback}
+          />
+        )}
         {tab === 'insights' && (
           <>
             <UsagePanel instances={instances} />

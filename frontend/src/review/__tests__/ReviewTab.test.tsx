@@ -8,6 +8,7 @@ vi.mock('../api');
 
 const report: ReviewReport = {
   generated_at: '', instance: 'local', model: 'claude-opus-4-8', sessions_reviewed: ['s1'],
+  run_id: '20260630T120000Z', trigger: 'manual',
   summary: 'Found a patch gap.',
   gaps: [{
     title: 'Patch loop', evidence: 'session s1', recommendation: 'harden the obsidian skill',
@@ -50,6 +51,33 @@ describe('ReviewTab', () => {
     render(<ReviewTab instances={['local']} />);
     expect(await screen.findByText('scheduled')).toBeInTheDocument();
     expect(screen.getByText(/3 gaps · 1 applied/)).toBeInTheDocument();
+  });
+
+  it('hides Prepare-edit unless write-back is enabled', async () => {
+    render(<ReviewTab instances={['local']} />);
+    await waitFor(() => expect(screen.getByText('Patch loop')).toBeInTheDocument());
+    expect(screen.queryByText('Prepare edit')).not.toBeInTheDocument();
+  });
+
+  it('prepares and applies an edit via the diff modal', async () => {
+    vi.mocked(api.proposeEdit).mockResolvedValue({
+      proposal_id: 'p1', run_id: '20260630T120000Z', gap_index: 0, skill_name: 'obsidian',
+      path: '/h/skills/note-taking/obsidian/SKILL.md', is_new: false, old_sha256: 'abc',
+      diff: '--- a\n+++ b\n@@ -1 +1 @@\n-old\n+new line\n', change_note: 'added a rule',
+      warnings: [], injection_flags: [],
+    });
+    vi.mocked(api.applyEdit).mockResolvedValue({
+      gap_index: 0, status: 'applied', path: '/h/skills/note-taking/obsidian/SKILL.md',
+      backup_path: '/state/x.bak', new_sha256: 'def', applied_at: '', error: '',
+    });
+    render(<ReviewTab instances={['local']} writebackEnabled />);
+    await waitFor(() => expect(screen.getByText('Patch loop')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('Prepare edit'));
+    await waitFor(() => expect(api.proposeEdit).toHaveBeenCalledWith('local', '20260630T120000Z', 0));
+    const approve = await screen.findByText('Approve & write');
+    fireEvent.click(approve);
+    await waitFor(() => expect(api.applyEdit).toHaveBeenCalledWith('local', 'p1'));
+    expect(await screen.findByText(/applied — backup/)).toBeInTheDocument();
   });
 
   it('runs a review on click', async () => {

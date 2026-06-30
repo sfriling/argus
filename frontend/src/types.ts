@@ -132,7 +132,7 @@ export type Overview = {
   refresh_seconds: number;
   instances: InstanceOverview[];
   claude_agents: ClaudeAgent[];
-  features?: { skill_review?: boolean };
+  features?: { skill_review?: boolean; skill_writeback?: boolean };
 };
 
 export type SkillGap = {
@@ -155,6 +155,32 @@ export type ReviewReport = {
   gaps: SkillGap[];
   health: SkillHealth[];
   drift: DriftItem[];
+  run_id?: string;
+  trigger?: string;
+};
+
+export type ProposedEdit = {
+  proposal_id: string;
+  run_id: string;
+  gap_index: number;
+  skill_name: string;
+  path: string;
+  is_new: boolean;
+  old_sha256: string;
+  diff: string;
+  change_note: string;
+  warnings: string[];
+  injection_flags: string[];
+};
+
+export type ApplyOutcome = {
+  gap_index: number;
+  status: string;
+  path: string;
+  backup_path: string;
+  new_sha256: string;
+  applied_at: string;
+  error: string;
 };
 
 export type LedgerIndexEntry = {

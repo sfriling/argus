@@ -1,4 +1,26 @@
-import type { ReviewJob, LedgerIndexEntry } from '../types';
+import type { ReviewJob, LedgerIndexEntry, ProposedEdit, ApplyOutcome } from '../types';
+
+async function postJson(url: string, body: unknown) {
+  const res = await fetch(url, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try { const b = await res.json(); if (b?.detail) detail = String(b.detail); } catch { /* keep */ }
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+/** Generate a proposed full-file rewrite for a gap (nothing is written). */
+export function proposeEdit(instance: string, run_id: string, gap_index: number): Promise<ProposedEdit> {
+  return postJson(`/api/skill-review/${encodeURIComponent(instance)}/propose-edit`, { run_id, gap_index });
+}
+
+/** Apply a previously-proposed edit (the server writes its own stored bytes). */
+export function applyEdit(instance: string, proposal_id: string): Promise<ApplyOutcome> {
+  return postJson(`/api/skill-review/${encodeURIComponent(instance)}/apply-edit`, { proposal_id });
+}
 
 /** Past review runs for an instance (newest first), from the persistent ledger. */
 export async function listRuns(instance: string): Promise<LedgerIndexEntry[]> {

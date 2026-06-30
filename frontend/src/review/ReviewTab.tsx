@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ReviewJob, SkillGap, LedgerIndexEntry } from '../types';
-import { runReview, fetchStatus, listRuns } from './api';
+import type { ReviewJob, SkillGap, LedgerIndexEntry, ProposedEdit, ApplyOutcome } from '../types';
+import { runReview, fetchStatus, listRuns, proposeEdit, applyEdit } from './api';
 
 function elapsed(fromIso: string): string {
   if (!fromIso) return '';
@@ -8,8 +8,11 @@ function elapsed(fromIso: string): string {
   return secs < 60 ? `${secs}s` : `${Math.floor(secs / 60)}m ${secs % 60}s`;
 }
 
-function GapCard({ g }: { g: SkillGap }) {
+function GapCard({ g, index, writebackEnabled, onPrepare, preparing }:
+  { g: SkillGap; index: number; writebackEnabled: boolean; onPrepare: (i: number) => void; preparing: boolean }) {
   const isNew = g.target_skill.toLowerCase() === 'new';
+  const truncated = g.target_skill.includes('…') || g.target_skill.includes('...');
+  const canApply = writebackEnabled && !isNew && !truncated && !!g.target_skill;
   return (
     <div className="rounded-xl border p-4" style={{ background: '#111113', borderColor: '#1f1f23' }}>
       <div className="flex items-center gap-2 mb-2">
@@ -25,6 +28,86 @@ function GapCard({ g }: { g: SkillGap }) {
         <pre className="text-xs rounded-lg p-3 overflow-x-auto whitespace-pre-wrap"
           style={{ background: '#0a0a0b', color: '#d4d4d8' }}>{g.suggested_edit}</pre>
       )}
+      {canApply && (
+        <button disabled={preparing} onClick={() => onPrepare(index)}
+          className="mt-3 text-xs font-medium px-3 py-1.5 rounded-lg"
+          style={{ color: '#0a0a0b', background: preparing ? '#27272a' : '#a78bfa' }}>
+          {preparing ? 'Preparing…' : 'Prepare edit'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function DiffModal({ instance, proposal, onClose, onApplied }:
+  { instance: string; proposal: ProposedEdit; onClose: () => void; onApplied: (o: ApplyOutcome) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [ackInjection, setAckInjection] = useState(false);
+  const hasInjection = proposal.injection_flags.length > 0;
+
+  async function approve() {
+    setBusy(true); setError(null);
+    try {
+      onApplied(await applyEdit(instance, proposal.proposal_id));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: '#000000cc' }}>
+      <div className="rounded-xl border w-full max-w-3xl max-h-[85vh] flex flex-col"
+        style={{ background: '#111113', borderColor: '#27272a' }}>
+        <div className="flex items-center gap-2 p-4 border-b" style={{ borderColor: '#1f1f23' }}>
+          <span className="text-sm font-semibold" style={{ color: '#f4f4f5' }}>{proposal.skill_name}</span>
+          <span className="text-xs font-mono ml-2" style={{ color: '#52525b', overflowWrap: 'anywhere' }}>{proposal.path}</span>
+          <button onClick={onClose} className="ml-auto text-xs px-2 py-1 rounded" style={{ color: '#a1a1aa' }}>✕</button>
+        </div>
+
+        {proposal.warnings.map((w, i) => (
+          <p key={i} className="px-4 pt-2 text-xs" style={{ color: '#f59e0b' }}>⚠ {w}</p>
+        ))}
+        {hasInjection && (
+          <div className="m-4 mb-0 rounded-lg p-3" style={{ background: '#7f1d1d22', border: '1px solid #ef444455' }}>
+            <p className="text-sm font-medium" style={{ color: '#fca5a5' }}>
+              Potentially unsafe content added: {proposal.injection_flags.join(', ')}
+            </p>
+            <p className="text-xs mt-1" style={{ color: '#a1a1aa' }}>
+              Skills are executed by the agent. Review the additions carefully.
+            </p>
+            <label className="flex items-center gap-2 mt-2 text-xs" style={{ color: '#d4d4d8' }}>
+              <input type="checkbox" checked={ackInjection} onChange={(e) => setAckInjection(e.target.checked)} />
+              I’ve reviewed the flagged additions and want to apply anyway
+            </label>
+          </div>
+        )}
+
+        <pre className="text-xs m-4 rounded-lg p-3 overflow-auto flex-1 whitespace-pre"
+          style={{ background: '#0a0a0b' }}>
+          {proposal.diff.split('\n').map((line, i) => {
+            const c = line.startsWith('+') && !line.startsWith('+++') ? '#22c55e'
+              : line.startsWith('-') && !line.startsWith('---') ? '#ef4444'
+              : line.startsWith('@@') ? '#38bdf8' : '#71717a';
+            return <div key={i} style={{ color: c }}>{line || ' '}</div>;
+          })}
+        </pre>
+
+        {error && <p className="px-4 text-sm" style={{ color: '#fca5a5' }}>{error}</p>}
+        <div className="flex items-center gap-2 p-4 border-t" style={{ borderColor: '#1f1f23' }}>
+          <span className="text-xs" style={{ color: '#52525b' }}>A timestamped backup is kept before writing.</span>
+          <button onClick={onClose} className="ml-auto text-xs px-3 py-1.5 rounded-lg" style={{ color: '#a1a1aa', background: '#27272a' }}>
+            Cancel
+          </button>
+          <button disabled={busy || (hasInjection && !ackInjection)} onClick={approve}
+            className="text-xs font-medium px-3 py-1.5 rounded-lg"
+            style={{ color: '#0a0a0b', background: busy || (hasInjection && !ackInjection) ? '#27272a' : '#22c55e' }}>
+            {busy ? 'Writing…' : 'Approve & write'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -38,15 +121,31 @@ function Section({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
-export function ReviewTab({ instances }: { instances: string[] }) {
+export function ReviewTab({ instances, writebackEnabled = false }:
+  { instances: string[]; writebackEnabled?: boolean }) {
   const [instance, setInstance] = useState(instances[0] ?? '');
   const [job, setJob] = useState<ReviewJob | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, tick] = useState(0); // re-render so the elapsed timer advances
   const [runs, setRuns] = useState<LedgerIndexEntry[]>([]);
+  const [proposal, setProposal] = useState<ProposedEdit | null>(null);
+  const [preparingIdx, setPreparingIdx] = useState<number | null>(null);
+  const [applied, setApplied] = useState<Record<number, string>>({});
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const running = job?.status === 'running';
+
+  async function prepare(gapIndex: number) {
+    if (!job?.report?.run_id) return;
+    setPreparingIdx(gapIndex); setError(null);
+    try {
+      setProposal(await proposeEdit(instance, job.report.run_id, gapIndex));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPreparingIdx(null);
+    }
+  }
 
   // Past reviews come from the persistent ledger — reload on instance change and when a run finishes.
   useEffect(() => {
@@ -137,7 +236,17 @@ export function ReviewTab({ instances }: { instances: string[] }) {
           {report.gaps.length > 0 && (
             <Section label={`Gaps (${report.gaps.length})`}>
               <div className="space-y-3">
-                {report.gaps.map((g, i) => <GapCard key={i} g={g} />)}
+                {report.gaps.map((g, i) => (
+                  <div key={i}>
+                    <GapCard g={g} index={i} writebackEnabled={writebackEnabled}
+                      onPrepare={prepare} preparing={preparingIdx === i} />
+                    {applied[i] && (
+                      <p className="text-xs mt-1" style={{ color: '#22c55e' }}>
+                        ✓ applied — backup: <span className="font-mono">{applied[i]}</span>
+                      </p>
+                    )}
+                  </div>
+                ))}
               </div>
             </Section>
           )}
@@ -192,6 +301,18 @@ export function ReviewTab({ instances }: { instances: string[] }) {
             ))}
           </div>
         </Section>
+      )}
+
+      {proposal && (
+        <DiffModal
+          instance={instance}
+          proposal={proposal}
+          onClose={() => setProposal(null)}
+          onApplied={(o) => {
+            if (o.status === 'applied') setApplied((m) => ({ ...m, [proposal.gap_index]: o.backup_path }));
+            setProposal(null);
+          }}
+        />
       )}
     </div>
   );
