@@ -175,6 +175,22 @@ class GapRecord(BaseModel):
     outcome: ApplyOutcome | None = None
 
 
+class ProposedEdit(BaseModel):
+    """A pending full-file rewrite the user reviews before applying. The proposed bytes are
+    stored SERVER-side (keyed by proposal_id, R4) — never echoed by the client."""
+    proposal_id: str = ""
+    run_id: str = ""
+    gap_index: int = 0
+    skill_name: str = ""
+    path: str = ""
+    is_new: bool = False
+    old_sha256: str = ""
+    diff: str = ""
+    change_note: str = ""
+    warnings: list[str] = Field(default_factory=list)
+    injection_flags: list[str] = Field(default_factory=list)
+
+
 class LedgerIndexEntry(BaseModel):
     run_id: str
     instance: str
@@ -207,6 +223,7 @@ class ReviewJob(BaseModel):
 
 class Features(BaseModel):
     skill_review: bool = False
+    skill_writeback: bool = False
 
 
 class PanelError(BaseModel):

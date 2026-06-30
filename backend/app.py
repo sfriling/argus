@@ -18,15 +18,19 @@ from backend.settings import (
     resolve_config_path,
     save,
     skill_review_available,
+    skill_writeback_available,
     validate,
 )
 from backend import kanban_actions
 from backend import session_detail
 from backend import skill_review as sr
 from backend.collectors.sessions import collect_sessions
+from uuid import uuid4
+
 from backend import review_ledger as ledger
+from backend import skill_writeback as wb
 from backend.review_scheduler import start_scheduler
-from backend.models import Features, GapRecord, LedgerRecord, ReviewJob
+from backend.models import Features, GapRecord, LedgerRecord, ProposedEdit, ReviewJob
 from backend.transport import make_runner
 
 
@@ -47,7 +51,10 @@ def create_app(config=None, aggregator=None) -> FastAPI:
         now_iso = datetime.now(timezone.utc).isoformat()
         ov = agg.get(now_iso)
         # features depend on the bound host + key, which the aggregator doesn't see.
-        ov.features = Features(skill_review=skill_review_available(agg.config, bind_host))
+        ov.features = Features(
+            skill_review=skill_review_available(agg.config, bind_host),
+            skill_writeback=skill_writeback_available(agg.config, bind_host),
+        )
         return ov
 
     @app.get("/api/config")
@@ -91,6 +98,7 @@ def create_app(config=None, aggregator=None) -> FastAPI:
     # --- skill review: long async job tracked in app.state so progress survives
     # page reloads / tab switches (a run can take minutes). ---
     app.state.review_job = ReviewJob()
+    app.state.proposals = {}            # proposal_id -> pending rewrite (server-stored bytes, R4)
     review_lock = threading.Lock()
 
     def _do_review(instance: str, inst, started_at: str, trigger: str = "manual"):
@@ -192,6 +200,78 @@ def create_app(config=None, aggregator=None) -> FastAPI:
         if rec is None:
             raise HTTPException(status_code=404, detail="run not found")
         return rec
+
+    def _writeback_gate():
+        if not skill_writeback_available(agg.config, bind_host):
+            raise HTTPException(
+                status_code=403,
+                detail=("Skill write-back is off. Set enable_skill_writeback: true and run via "
+                        "`argus serve` bound to localhost."),
+            )
+
+    @app.post("/api/skill-review/{instance}/propose-edit")
+    def propose_edit(instance: str, body: dict):
+        inst = _instance_or_404(instance)
+        _writeback_gate()
+        run_id = str(body.get("run_id") or "")
+        gap_index = int(body.get("gap_index") or 0)
+        rec = ledger.read_run(instance, run_id)
+        if rec is None or gap_index < 0 or gap_index >= len(rec.gaps):
+            raise HTTPException(status_code=404, detail="run or gap not found")
+        gap = rec.gaps[gap_index].gap
+        runner = make_runner(inst)
+        is_new = gap.target_skill.strip().lower() == "new"
+        _, all_names, _ = sr.gather_skills(runner, inst)
+        if is_new:
+            path = wb.new_skill_path(inst, str(body.get("new_skill_name") or ""))
+            if path is None:
+                raise HTTPException(status_code=422, detail="new skill requires a valid name")
+            cur, full, old_sha = None, "", ""
+        else:
+            path = wb.resolve_skill_path(runner, inst, gap.target_skill, all_names)
+            if path is None:
+                raise HTTPException(status_code=422, detail=f"could not locate skill {gap.target_skill!r}")
+            cur = runner.read_bytes(path)
+            full = (cur or b"").decode("utf-8", "replace")
+            old_sha = wb.sha256(cur or b"")
+        try:
+            new_content, note = wb.rewrite_skill(full, gap, agg.config.skill_review_model,
+                                                 anthropic_key(agg.config), claude_bin=agg.config.claude_bin)
+            warnings = wb.sanity_check(full, new_content)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e)[:300])
+        proposal_id = uuid4().hex
+        app.state.proposals[proposal_id] = {
+            "new_bytes": new_content.encode("utf-8"), "path": path, "old_sha": old_sha,
+            "gap_index": gap_index, "run_id": run_id, "is_new": is_new, "instance": instance,
+        }
+        return ProposedEdit(
+            proposal_id=proposal_id, run_id=run_id, gap_index=gap_index, skill_name=gap.target_skill,
+            path=path, is_new=is_new, old_sha256=old_sha, diff=wb.compute_diff(full, new_content, path),
+            change_note=note, warnings=warnings, injection_flags=wb.injection_scan(full, new_content),
+        )
+
+    @app.post("/api/skill-review/{instance}/apply-edit")
+    def apply_edit(instance: str, body: dict):
+        inst = _instance_or_404(instance)
+        _writeback_gate()
+        prop = app.state.proposals.get(str(body.get("proposal_id") or ""))
+        if not prop or prop["instance"] != instance:
+            raise HTTPException(status_code=404, detail="proposal not found — re-propose")
+        runner = make_runner(inst)
+
+        def _save_backup(cur_bytes: bytes) -> str:
+            return ledger.save_backup(instance, prop["path"], cur_bytes, datetime.now(timezone.utc))
+
+        outcome = wb.apply_edit(runner, prop["gap_index"], prop["path"], prop["old_sha"],
+                                prop["new_bytes"], is_new=prop["is_new"], save_backup=_save_backup)
+        ledger.update_gap_outcome(instance, prop["run_id"], prop["gap_index"], outcome)
+        if outcome.status == "applied":
+            app.state.proposals.pop(str(body.get("proposal_id")), None)
+            return outcome
+        if outcome.status == "conflict":
+            raise HTTPException(status_code=409, detail=outcome.error)
+        raise HTTPException(status_code=400, detail=outcome.error)
 
     @app.get("/api/sessions/{instance}/{session_id}")
     def session_drilldown(instance: str, session_id: str):

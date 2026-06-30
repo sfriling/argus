@@ -123,6 +123,25 @@ def update_gap_outcome(instance: str, run_id: str, gap_index: int, outcome: Appl
         return rec
 
 
+def save_backup(instance: str, skill_path: str, content: bytes, now: datetime,
+                *, root: Path | None = None) -> str:
+    """Persist the prior bytes of a SKILL.md OUTSIDE the synced skills tree (R8), under the Argus
+    state dir, with a collision-proof high-res name (exclusive create)."""
+    skill = Path(skill_path).parent.name or "skill"
+    d = _instance_dir(root, instance) / "backups" / skill
+    d.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(d, 0o700)
+    except OSError:
+        pass
+    stamp = now.strftime("%Y%m%dT%H%M%S_%f") + "Z"
+    p = d / f"{stamp}.bak"
+    fd = os.open(str(p), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "wb") as fh:
+        fh.write(content)
+    return str(p)
+
+
 def prune(instance: str, keep: int = 50, *, root: Path | None = None) -> int:
     with _INDEX_LOCK:
         rows = _read_index(root, instance)
