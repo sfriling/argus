@@ -38,6 +38,19 @@ function stateStyle(agent: ClaudeAgent): { label: string; color: string; bg: str
   return { label: s || 'idle', color: '#a1a1aa', bg: '#a1a1aa18' };
 }
 
+function KindTag({ agent }: { agent: ClaudeAgent }) {
+  if (agent.kind !== 'interactive') return null;
+  return (
+    <span
+      className="text-xs px-1.5 py-0.5 rounded-md font-mono flex-shrink-0"
+      style={{ color: '#a78bfa', background: '#a78bfa18' }}
+      title="An open interactive `claude` terminal (not a background job)"
+    >
+      term
+    </span>
+  );
+}
+
 function StateBadge({ agent }: { agent: ClaudeAgent }) {
   const { label, color, bg } = stateStyle(agent);
   return (
@@ -79,6 +92,7 @@ function ActiveCard({ agent }: { agent: ClaudeAgent }) {
         <span className="text-sm font-semibold truncate" style={{ color: '#f4f4f5' }}>
           {agent.name || agent.id}
         </span>
+        <KindTag agent={agent} />
         <span className="ml-auto">
           <StateBadge agent={agent} />
         </span>
@@ -100,6 +114,7 @@ function RecentRow({ agent }: { agent: ClaudeAgent }) {
         <span className="text-sm font-medium truncate" style={{ color: '#d4d4d8' }}>
           {agent.name || agent.id}
         </span>
+        <KindTag agent={agent} />
         <span className="ml-auto flex items-center gap-2">
           <span className="text-xs" style={{ color: '#52525b' }}>
             {formatTokens(agent.tokens)} tok

@@ -67,6 +67,7 @@ export type ClaudeAgent = {
   live: boolean;
   busy: boolean;
   active: boolean;
+  kind?: string; // "background" | "interactive"
 };
 
 export type SessionMeta = {

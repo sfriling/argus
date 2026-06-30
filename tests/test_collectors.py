@@ -235,3 +235,51 @@ def test_claude_agents_done_window_filter():
 
 def test_claude_agents_empty():
     assert parse_claude_agents([], [], now=NOW) == []
+
+
+def _ms(dt):
+    return int(dt.timestamp() * 1000)
+
+
+def test_claude_agents_interactive_session_surfaced():
+    # an open `claude` terminal: kind=interactive, NO jobId -> must show as its own agent
+    recent = _ms(datetime(2026, 6, 29, 11, 0, 0, tzinfo=timezone.utc))
+    sessions = [json.dumps({
+        "pid": 43268, "sessionId": "abc12345-zzzz", "cwd": "D:\\Projects\\LASMonitor",
+        "kind": "interactive", "name": "lasmonitor-f7", "status": "busy",
+        "startedAt": recent, "updatedAt": recent,
+    })]
+    agents = parse_claude_agents([], sessions, now=NOW)
+    assert len(agents) == 1
+    a = agents[0]
+    assert a.kind == "interactive"
+    assert a.name == "lasmonitor-f7"
+    assert a.session_id == "abc12345-zzzz"
+    assert a.live is True and a.busy is True and a.active is True
+
+
+def test_claude_agents_background_session_not_double_counted():
+    # a session WITH a jobId is the join for a background job — must not be re-added as interactive
+    jobs = [_job("act1", "blocked", "active", "2026-06-29T09:00:00Z", sess="live-sid")]
+    sessions = [json.dumps({"pid": 1, "jobId": "act1", "sessionId": "live-sid",
+                            "kind": "interactive", "status": "busy"})]
+    agents = parse_claude_agents(jobs, sessions, now=NOW)
+    assert len(agents) == 1
+    assert agents[0].kind == "background"
+
+
+def test_claude_agents_interactive_stale_dropped_idle_named_from_cwd():
+    stale = _ms(datetime(2026, 6, 1, 0, 0, 0, tzinfo=timezone.utc))   # >7d before NOW -> dropped
+    idle = _ms(datetime(2026, 6, 29, 10, 0, 0, tzinfo=timezone.utc))  # recent idle -> kept
+    sessions = [
+        json.dumps({"pid": 1, "sessionId": "stale1", "cwd": "D:\\a",
+                    "kind": "interactive", "status": "idle", "updatedAt": stale}),
+        json.dumps({"pid": 2, "sessionId": "idle1", "cwd": "D:\\Projects\\Foo",
+                    "kind": "interactive", "status": "idle", "updatedAt": idle}),
+    ]
+    agents = parse_claude_agents([], sessions, now=NOW, days=7)
+    assert len(agents) == 1
+    a = agents[0]
+    assert a.session_id == "idle1"
+    assert a.name == "Foo"                         # derived from cwd basename
+    assert a.live is True and a.active is False     # idle: live (shown) but not pinned-active

@@ -65,6 +65,14 @@ def _parse_iso(s: str) -> datetime | None:
         return None
 
 
+def _epoch_ms_iso(v) -> str:
+    """Session files stamp times as epoch-millis; jobs use ISO. Normalize to ISO."""
+    try:
+        return datetime.fromtimestamp(float(v) / 1000.0, tz=timezone.utc).isoformat()
+    except Exception:
+        return ""
+
+
 def parse_claude_agents(job_entries, session_texts, now: datetime | None = None,
                         days: int = 7, limit: int = 50) -> list[ClaudeAgent]:
     now = now or datetime.now(timezone.utc)
@@ -125,7 +133,53 @@ def parse_claude_agents(job_entries, session_texts, now: datetime | None = None,
             live=live,
             busy=busy,
             active=active,
+            kind="background",
         ))
+
+    # Interactive `claude` terminals have no background job (no jobId), so the loop above
+    # never sees them — they'd be invisible. Surface each jobless interactive session as its
+    # own agent so an open terminal shows alongside background agents.
+    seen_sids = {a.session_id for a in agents if a.session_id}
+    for text in session_texts:
+        try:
+            s = json.loads(text)
+        except Exception:
+            continue
+        if not isinstance(s, dict):
+            continue
+        if s.get("jobId"):                                  # background — already shown via its job
+            continue
+        if str(s.get("kind") or "") != "interactive":
+            continue
+        sid = str(s.get("sessionId") or "")
+        if sid and sid in seen_sids:
+            continue
+        updated = _epoch_ms_iso(s.get("updatedAt") or s.get("statusUpdatedAt") or s.get("startedAt"))
+        ts = _parse_iso(updated)
+        if ts is not None and (now - ts).total_seconds() > days * 86400:
+            continue                                        # clearly-stale registry file — skip
+        status = str(s.get("status") or "").lower()
+        name = str(s.get("name") or "")
+        if not name:
+            cwd = str(s.get("cwd") or "")
+            name = cwd.replace("\\", "/").rstrip("/").split("/")[-1] or "interactive"
+        busy = status == "busy"
+        agents.append(ClaudeAgent(
+            id=(sid[:8] or str(s.get("pid") or "")),
+            name=name,
+            task="",
+            state=status or "interactive",
+            cwd=str(s.get("cwd") or ""),
+            session_id=sid,
+            created_at=_epoch_ms_iso(s.get("startedAt")),
+            updated_at=updated,
+            live=True,
+            busy=busy,
+            active=busy,
+            kind="interactive",
+        ))
+        if sid:
+            seen_sids.add(sid)
 
     # Filter: keep active/live always; keep done/idle only if updated within `days`.
     kept: list[ClaudeAgent] = []
