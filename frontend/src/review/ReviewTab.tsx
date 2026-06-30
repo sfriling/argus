@@ -83,7 +83,8 @@ export function ReviewTab({ instances }: { instances: string[] }) {
       {error && <p className="text-sm" style={{ color: '#fca5a5' }}>{error}</p>}
       {busy && !error && <p className="text-sm" style={{ color: '#52525b' }}>Reviewing recent sessions…</p>}
 
-      {report && (
+      {/* only show a report that belongs to the selected instance */}
+      {report && report.instance === instance && (
         <>
           <p className="text-sm" style={{ color: '#d4d4d8' }}>{report.summary}</p>
           <p className="text-xs" style={{ color: '#3f3f46' }}>
@@ -126,8 +127,10 @@ export function ReviewTab({ instances }: { instances: string[] }) {
         </>
       )}
 
-      {!report && !busy && !error && (
-        <p className="text-sm" style={{ color: '#52525b' }}>No review yet. Click “Run review” to start.</p>
+      {(!report || report.instance !== instance) && !busy && !error && (
+        <p className="text-sm" style={{ color: '#52525b' }}>
+          No review for <span style={{ color: '#a1a1aa' }}>{instance}</span> yet. Click “Run review” to start.
+        </p>
       )}
     </div>
   );

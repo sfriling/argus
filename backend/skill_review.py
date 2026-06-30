@@ -98,10 +98,11 @@ def read_trajectory(runner, instance) -> list[dict]:
 
 
 def gather_skills(runner, instance, max_custom: int = 8) -> tuple[dict[str, str], list[str], set[str]]:
-    """Return ({custom_name: content}, all_skill_names, custom_name_set) for an instance."""
+    """Return ({custom_name: SKILL.md content}, all_skill_names, custom_name_set) for an instance.
+    Reads the SKILL.md files directly (`skills inspect` is slow/network-bound and times out)."""
     r = runner.run(["skills", "list"], timeout=15)
     names: list[str] = []
-    custom: list[str] = []
+    custom: list[tuple[str, str]] = []   # (name, category)
     for line in (r.stdout or "").splitlines():
         if "│" not in line and "|" not in line:
             continue
@@ -113,30 +114,40 @@ def gather_skills(runner, instance, max_custom: int = 8) -> tuple[dict[str, str]
             continue
         names.append(name)
         if any(c.lower() == "local" for c in cells):
-            custom.append(name)
+            custom.append((name, cells[1] if len(cells) > 1 else ""))
 
+    skills_root = instance.hermes_home.rstrip("/\\") + "/skills"
     contents: dict[str, str] = {}
-    for name in custom[:max_custom]:
-        ir = runner.run(["skills", "inspect", name], timeout=15)
-        if ir.ok and ir.stdout:
-            contents[name] = ir.stdout[:6000]
-    return contents, names, set(custom)
+    for name, category in custom[:max_custom]:
+        # name may be truncated in the table (…); only read clean names
+        if "…" in name or "..." in name:
+            continue
+        for path in ([f"{skills_root}/{category}/{name}/SKILL.md"] if category else []) + [
+            f"{skills_root}/{name}/SKILL.md"
+        ]:
+            text = runner.read(path)
+            if text:
+                contents[name] = text[:3000]
+                break
+    return contents, names, {n for n, _ in custom}
 
 
-def _condense_transcript(export_text: str, max_chars: int = 6000) -> str:
+def _condense_transcript(export_text: str, max_chars: int = 3500) -> str:
+    """A compact, struggle-focused view: title + tool calls + tool ERRORS (the loop evidence),
+    with prose kept brief. Tool errors matter most, so they're never dropped first."""
     d = parse_session(export_text)
     if not d:
         return "(could not parse)"
-    lines = [f"[meta] {d.meta.tool_call_count} tool calls, {d.meta.message_count} msgs, end={d.meta.end_reason or '—'}"]
+    lines = [f"[meta] title={d.meta.title!r} {d.meta.tool_call_count} tool calls, "
+             f"{d.meta.message_count} msgs, end={d.meta.end_reason or '—'}"]
     for m in d.messages:
         if m.role == "tool":
-            err = m.result if '"error"' in m.result.lower() else ""
-            if err:
-                lines.append(f"  tool {m.tool_name} -> ERROR {err[:160]}")
+            if '"error"' in m.result.lower():
+                lines.append(f"  -> ERROR from {m.tool_name}: {m.result[:140]}")
         elif m.tools:
-            lines.append(f"assistant -> calls: {', '.join(m.tools)}")
+            lines.append(f"assistant calls: {', '.join(m.tools)}")
         elif m.text:
-            lines.append(f"{m.role}: {m.text[:200]}")
+            lines.append(f"{m.role}: {m.text[:120]}")
     out = "\n".join(lines)
     return out[:max_chars]
 
@@ -274,9 +285,11 @@ def _default_cli_run(claude_bin: str, model: str, prompt: str) -> str:
     exe = shutil.which(claude_bin) or claude_bin
     no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     p = subprocess.run(
-        [exe, "-p", "--output-format", "json", "--model", model],
+        # --allowed-tools "" → no tools, so the reviewer answers in one shot from the prompt
+        # instead of going agentic (reading the files mentioned in the context).
+        [exe, "-p", "--output-format", "json", "--model", model, "--allowed-tools", ""],
         input=prompt, capture_output=True, text=True, encoding="utf-8", errors="replace",
-        timeout=300, creationflags=no_window,
+        timeout=420, creationflags=no_window,
     )
     if p.returncode != 0:
         raise ValueError((p.stderr or p.stdout or "claude CLI failed").strip()[:300])

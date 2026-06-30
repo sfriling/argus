@@ -97,7 +97,7 @@ def create_app(config=None, aggregator=None) -> FastAPI:
         runner = make_runner(inst)
         events = sr.read_trajectory(runner, inst)
         sessions = collect_sessions(runner, inst, limit=12)
-        ids = sr.triage(events, sessions, limit=5)
+        ids = sr.triage(events, sessions, limit=3)
         skills, names, custom = sr.gather_skills(runner, inst)
 
         # cross-instance drift (deterministic, no LLM)
