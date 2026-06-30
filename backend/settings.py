@@ -13,6 +13,29 @@ import yaml
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 
 
+class ScheduleConfig(BaseModel):
+    """Per-instance auto-review cadence. Read-only reviews only — never writes."""
+    enabled: bool = False
+    time: Optional[str] = None            # daily, local "HH:MM" (24h)
+    interval_hours: Optional[int] = None  # or every N hours
+
+    @model_validator(mode="after")
+    def _exactly_one(self) -> "ScheduleConfig":
+        if not self.enabled:
+            return self
+        has_time = bool(self.time)
+        has_interval = self.interval_hours is not None
+        if has_time == has_interval:
+            raise ValueError("schedule: set exactly one of 'time' or 'interval_hours' when enabled")
+        if has_time:
+            import re
+            if not re.match(r"^([01]?\d|2[0-3]):[0-5]\d$", self.time or ""):
+                raise ValueError("schedule.time must be 'HH:MM' (24h)")
+        if has_interval and (self.interval_hours or 0) < 1:
+            raise ValueError("schedule.interval_hours must be >= 1")
+        return self
+
+
 class Instance(BaseModel):
     name: str
     transport: str = "local"  # "local" | "ssh"
@@ -22,6 +45,8 @@ class Instance(BaseModel):
     ssh: Optional[str] = None
     ssh_key: Optional[str] = None
     reliability_log: Optional[str] = None  # override; defaults to <hermes_home>/reliability/...
+    schedule: Optional[ScheduleConfig] = None     # auto-review cadence (read-only)
+    synced_skills: bool = False                   # skills tree kept in sync externally (Mutagen) → write once
 
     @field_validator("transport")
     @classmethod
@@ -45,6 +70,7 @@ class AppConfig(BaseModel):
     enable_config_writes: bool = False  # gate for the Settings-UI write endpoints
     enable_actions: bool = False        # gate for kanban (and future) write actions
     enable_skill_review: bool = False   # gate for the Claude-powered skill review (opt-in)
+    enable_skill_writeback: bool = False  # gate for applying edits to SKILL.md files (default off)
     skill_review_model: str = "claude-opus-4-8"
     anthropic_api_key: str = ""         # prefer the ANTHROPIC_API_KEY env var over this
     claude_bin: str = "claude"          # Claude Code CLI — used (subscription auth) when no API key
@@ -178,6 +204,22 @@ def skill_review_available(config: AppConfig, bind_host: Optional[str] = None) -
         bool(config.enable_skill_review)
         and is_localhost(host)
         and (bool(anthropic_key(config)) or has_claude_cli(config))
+    )
+
+
+def skill_writeback_available(config: AppConfig, bind_host: Optional[str] = None) -> bool:
+    """Write-back (applying edits to SKILL.md) requires enable_skill_writeback AND that the server
+    is PROVABLY bound to localhost. Per R10 we do NOT trust config.host: writes require
+    ARGUS_BIND_HOST to be set (which `argus serve` does) and to be a loopback address. A bare
+    `uvicorn --host 0.0.0.0` (which never sets ARGUS_BIND_HOST) can therefore never write."""
+    env_host = os.environ.get("ARGUS_BIND_HOST")
+    if not env_host:
+        return False
+    host = bind_host if bind_host is not None else env_host
+    return (
+        bool(config.enable_skill_writeback)
+        and is_localhost(host or "")
+        and skill_review_available(config, host)
     )
 
 

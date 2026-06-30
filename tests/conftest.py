@@ -1,7 +1,16 @@
 from __future__ import annotations
 
+import pytest
+
 from backend.config import Instance
 from backend.transport import RunResult
+
+
+@pytest.fixture(autouse=True)
+def _isolate_review_ledger(tmp_path, monkeypatch):
+    """Every test writes the review ledger to its own tmp dir — never the real
+    %APPDATA%/Argus/reviews, and no cross-test contamination."""
+    monkeypatch.setattr("backend.review_ledger.reviews_state_dir", lambda: tmp_path / "argus-reviews")
 
 
 class FakeRunner:

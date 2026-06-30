@@ -25,6 +25,7 @@ from backend import session_detail
 from backend import skill_review as sr
 from backend.collectors.sessions import collect_sessions
 from backend import review_ledger as ledger
+from backend.review_scheduler import start_scheduler
 from backend.models import Features, GapRecord, LedgerRecord, ReviewJob
 from backend.transport import make_runner
 
@@ -92,7 +93,7 @@ def create_app(config=None, aggregator=None) -> FastAPI:
     app.state.review_job = ReviewJob()
     review_lock = threading.Lock()
 
-    def _do_review(instance: str, inst, started_at: str):
+    def _do_review(instance: str, inst, started_at: str, trigger: str = "manual"):
         try:
             runner = make_runner(inst)
             events = sr.read_trajectory(runner, inst)
@@ -118,7 +119,7 @@ def create_app(config=None, aggregator=None) -> FastAPI:
                                instance, ids, now_iso, claude_bin=agg.config.claude_bin)
             report.drift = drift
             report.run_id = report.run_id or ledger.new_run_id(datetime.now(timezone.utc))
-            report.trigger = "manual"
+            report.trigger = trigger
             try:
                 ledger.write_run(LedgerRecord(
                     report=report,
@@ -140,6 +141,18 @@ def create_app(config=None, aggregator=None) -> FastAPI:
                     finished_at=datetime.now(timezone.utc).isoformat(), error=str(e)[:300],
                 )
 
+    def start_review(instance: str, inst, trigger: str = "manual"):
+        """Atomic single-flight: start a review if none is running, else return None.
+        Used by BOTH the manual endpoint and the scheduler so they never overlap (R11)."""
+        started_at = datetime.now(timezone.utc).isoformat()
+        with review_lock:
+            if app.state.review_job.status == "running":
+                return None
+            running = ReviewJob(status="running", instance=instance, started_at=started_at)
+            app.state.review_job = running
+        threading.Thread(target=_do_review, args=(instance, inst, started_at, trigger), daemon=True).start()
+        return running
+
     @app.post("/api/skill-review/{instance}/run")
     def skill_review_run(instance: str):
         inst = _instance_or_404(instance)
@@ -149,17 +162,12 @@ def create_app(config=None, aggregator=None) -> FastAPI:
                 detail=("Skill review is off. Set enable_skill_review: true, bind Argus to "
                         "localhost, and provide an ANTHROPIC_API_KEY."),
             )
-        started_at = datetime.now(timezone.utc).isoformat()
-        with review_lock:
-            if app.state.review_job.status == "running":
-                raise HTTPException(
-                    status_code=409,
-                    detail=f"a review is already running for {app.state.review_job.instance!r}",
-                )
-            running = ReviewJob(status="running", instance=instance, started_at=started_at)
-            app.state.review_job = running
-        threading.Thread(target=_do_review, args=(instance, inst, started_at), daemon=True).start()
-        # return the captured running job, not app.state (the thread may have already swapped it)
+        running = start_review(instance, inst, "manual")
+        if running is None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"a review is already running for {app.state.review_job.instance!r}",
+            )
         return running
 
     @app.get("/api/skill-review/status")
@@ -241,8 +249,43 @@ def create_app(config=None, aggregator=None) -> FastAPI:
             raise HTTPException(status_code=400, detail=(r.stderr or r.stdout or "action failed").strip()[:400])
         return {"ok": True, "stdout": (r.stdout or "").strip()}
 
+    def _last_runs() -> dict:
+        """Most-recent run time per instance (local-naive), for the scheduler's level-trigger.
+        Seeded from the ledger so a restart doesn't re-fire a schedule already satisfied today."""
+        out: dict = {}
+        for i in agg.config.instances:
+            runs = ledger.list_runs(i.name, limit=1)
+            out[i.name] = _iso_to_local_naive(runs[0].started_at) if runs else None
+        return out
+
+    @app.on_event("startup")
+    def _start_scheduler():
+        sched, stop = start_scheduler(
+            lambda: agg.config, start_review, _last_runs,
+            available=skill_review_available(agg.config, bind_host),
+        )
+        app.state.review_scheduler = sched
+        app.state.review_scheduler_stop = stop
+
+    @app.on_event("shutdown")
+    def _stop_scheduler():
+        stop = getattr(app.state, "review_scheduler_stop", None)
+        if stop is not None:
+            stop.set()
+
     dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
     if dist.exists():
         app.mount("/", StaticFiles(directory=str(dist), html=True), name="static")
 
     return app
+
+
+def _iso_to_local_naive(s: str):
+    """Parse a UTC-ish ISO timestamp to a local naive datetime (the scheduler works in local time)."""
+    try:
+        dt = datetime.fromisoformat((s or "").replace("Z", "+00:00"))
+        if dt.tzinfo is not None:
+            dt = dt.astimezone().replace(tzinfo=None)
+        return dt
+    except Exception:
+        return None

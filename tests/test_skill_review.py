@@ -241,6 +241,11 @@ def test_run_conflict_when_already_running(monkeypatch):
     second = client.post("/api/skill-review/local/run")   # while the first is still in flight
     assert second.status_code == 409
     gate.set()   # let the first finish so the thread doesn't dangle
+    import time
+    for _ in range(60):                                   # drain it within this test (no lingering ledger writes)
+        if client.get("/api/skill-review/status").json()["status"] != "running":
+            break
+        time.sleep(0.05)
 
 
 def test_review_persisted_to_ledger(monkeypatch, tmp_path):
