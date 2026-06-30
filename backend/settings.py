@@ -66,6 +66,11 @@ def _standard_config_path() -> Path:
     return Path(base) / "argus" / "config.yaml"
 
 
+def reviews_state_dir() -> Path:
+    """Where the review ledger lives — beside the config file, under reviews/."""
+    return _standard_config_path().parent / "reviews"
+
+
 def resolve_config_path(explicit: Optional[str] = None) -> Path:
     """Precedence: explicit arg → $ARGUS_CONFIG → repo-local ./config.yaml → standard user dir."""
     if explicit:

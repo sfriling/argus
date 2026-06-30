@@ -156,6 +156,42 @@ class ReviewReport(BaseModel):
     gaps: list[SkillGap] = Field(default_factory=list)
     health: list[SkillHealth] = Field(default_factory=list)
     drift: list[DriftItem] = Field(default_factory=list)
+    run_id: str = ""
+    trigger: str = "manual"          # "manual" | "scheduled"
+
+
+class ApplyOutcome(BaseModel):
+    gap_index: int
+    status: str                      # "applied" | "skipped" | "conflict" | "failed"
+    path: str = ""
+    backup_path: str = ""
+    new_sha256: str = ""
+    applied_at: str = ""
+    error: str = ""
+
+
+class GapRecord(BaseModel):
+    gap: SkillGap
+    outcome: ApplyOutcome | None = None
+
+
+class LedgerIndexEntry(BaseModel):
+    run_id: str
+    instance: str
+    started_at: str = ""
+    finished_at: str = ""
+    status: str = ""                 # "done" | "error"
+    model: str = ""
+    trigger: str = "manual"          # "manual" | "scheduled"
+    gap_count: int = 0
+    applied_count: int = 0
+
+
+class LedgerRecord(BaseModel):
+    report: ReviewReport
+    gaps: list[GapRecord] = Field(default_factory=list)
+    trigger: str = "manual"
+    created_at: str = ""
 
 
 class ReviewJob(BaseModel):
