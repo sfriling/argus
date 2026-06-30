@@ -34,16 +34,38 @@ def _sid(s: Any) -> str:
     return str(getattr(s, "id", None) or (s.get("id") if isinstance(s, dict) else "") or "")
 
 
-def triage(trajectory_events: list[dict], sessions: list, limit: int = 5) -> list[str]:
+def _session_when(sid: str) -> str:
+    """Hermes session ids start with YYYYMMDD_HHMMSS — surface the full timestamp so the reviewer
+    can decide the 'occurred after the fix?' timing rule even for same-day cases (date-only loses
+    the time and makes same-day regressions undecidable)."""
+    m = re.match(r"^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})", sid or "")
+    if m:
+        return f"{m.group(1)}-{m.group(2)}-{m.group(3)} {m.group(4)}:{m.group(5)}:{m.group(6)}"
+    m = re.match(r"^(\d{4})(\d{2})(\d{2})", sid or "")
+    return f"{m.group(1)}-{m.group(2)}-{m.group(3)}" if m else ""
+
+
+def triage(trajectory_events: list[dict], sessions: list, limit: int = 5,
+           reviewed_sids: Optional[set] = None) -> list[str]:
     """Rank sessions by struggle: trajectory strugglers first (loop-breaks > rejections >
-    inferences), then fill with the most recent sessions. Returns up to `limit` session ids."""
+    inferences), then fill with the most recent sessions. Sessions already reviewed-and-acted-on
+    (in `reviewed_sids`) are nudged down so fresh struggles surface first. Returns up to `limit`
+    session ids."""
+    reviewed = reviewed_sids or set()
     by_session: dict[str, list[dict]] = defaultdict(list)
     for e in trajectory_events:
         sid = e.get("session_id")
         if sid:
             by_session[str(sid)].append(e)
 
-    scored = sorted(by_session.items(), key=lambda kv: _struggle_score(kv[1]), reverse=True)
+    # Rank not-yet-acted-on struggles STRICTLY ahead of already-acted-on ones (primary key), then
+    # by struggle score (secondary). A flat penalty wasn't enough: persistent heavy strugglers that
+    # were already fixed would keep filling all the slots and crowd out a fresh regression. Acted-on
+    # sessions still appear (after the fresh ones) so a genuine recurrence is never hard-excluded.
+    def _key(sid: str, evs: list[dict]):
+        return (1 if sid in reviewed else 0, -_struggle_score(evs))
+
+    scored = sorted(by_session.items(), key=lambda kv: _key(kv[0], kv[1]))
     ordered = [sid for sid, evs in scored if _struggle_score(evs) > 0]
     seen = set(ordered)
     for s in sessions:
@@ -177,12 +199,22 @@ def _condense_transcript(export_text: str, max_chars: int = 3500) -> str:
 
 
 def assemble(runner, instance, session_ids: list[str], skills: dict[str, str], all_names: list[str],
-             memory: dict[str, str] | None = None) -> str:
-    parts = ["# Hermes sessions that struggled (most → least)"]
+             memory: dict[str, str] | None = None, applied: list[dict] | None = None) -> str:
+    parts = []
+    if applied:
+        parts.append("# Already addressed in prior reviews (skill | what was fixed | when applied) "
+                     "— see the timing rule in your instructions before re-raising any of these:")
+        for a in applied:
+            parts.append(f"- {a.get('skill','')} | {a.get('title','')} | "
+                         f"{a.get('applied_at','') or '(time unknown)'}")
+        parts.append("")
+    parts.append("# Hermes sessions that struggled (most → least)")
     for sid in session_ids:
         r = runner.run(["sessions", "export", "--session-id", sid, "-"], timeout=25)
         if r.ok and r.stdout:
-            parts.append(f"\n## Session {sid}\n{_condense_transcript(r.stdout)}")
+            d = _session_when(sid)
+            hdr = f"## Session {sid}" + (f" (occurred {d})" if d else " (occurred: unknown)")
+            parts.append(f"\n{hdr}\n{_condense_transcript(r.stdout)}")
     parts.append("\n\n# Current custom skills (full content)")
     for name, content in skills.items():
         parts.append(f"\n## SKILL: {name}\n{content}")
@@ -206,8 +238,16 @@ SYSTEM = (
     "gap. For each gap give concrete, minimal suggested edit text. Also flag stale, inaccurate, or "
     "contradictory entries in EITHER the skills OR the memory. Memory is per-machine and "
     "intentionally unsynced (file paths differ between machines) — never suggest syncing memory or "
-    "treat path differences as a problem. Be precise and evidence-based; cite the session id. Call "
-    "submit_review exactly once."
+    "treat path differences as a problem. "
+    "You may be given a list of edits ALREADY APPLIED to skills (each with a timestamp), and every "
+    "struggling session shows when it occurred. Before raising a gap, check that list: if a prior "
+    "edit already addressed the same problem in the same skill, SUPPRESS the gap ONLY when the "
+    "struggling session CLEARLY occurred BEFORE that edit (an earlier day, or clearly earlier the "
+    "same day). If the session occurred at or after the edit, OR you cannot tell (same time, "
+    "missing/ambiguous timestamps, possibly different time zones), treat it as a POSSIBLE "
+    "REGRESSION and DO raise it — a redundant proposal is cheap to reject in review, a missed "
+    "regression is not. Be precise and evidence-based; cite the session id. Call submit_review "
+    "exactly once."
 )
 
 REVIEW_TOOL = {

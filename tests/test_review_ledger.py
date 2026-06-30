@@ -75,3 +75,51 @@ def test_prune_keeps_newest(tmp_path):
     assert removed == 3
     ids = [e.run_id for e in L.list_runs("local", root=tmp_path)]
     assert ids == ["20260630T140000Z", "20260630T130000Z"]
+
+
+# --- applied-history / reviewed-sessions (dedup support) ---------------------
+
+def test_applied_history_and_reviewed_sessions(tmp_path):
+    from backend.models import ApplyOutcome
+    # run A: one gap applied; run B: no applies
+    # run A reviewed sessA1+sessA2; the APPLIED gap cites only sessA1 in its evidence
+    recA = LedgerRecord(
+        report=ReviewReport(summary="s", instance="local", model="m", run_id="20260630T120000Z",
+                            sessions_reviewed=["sessA1", "sessA2"]),
+        gaps=[GapRecord(gap=SkillGap(title="patch loop", target_skill="obsidian",
+                                     evidence="session sessA1 looped on patch")),
+              GapRecord(gap=SkillGap(title="other", target_skill="kanban", evidence="session sessA2"))],
+        trigger="manual", created_at="2026-06-30T12:00:00Z",
+    )
+    L.write_run(recA, root=tmp_path)
+    L.update_gap_outcome("local", "20260630T120000Z", 0,
+                         ApplyOutcome(gap_index=0, status="applied", applied_at="2026-06-30T12:05:00Z"),
+                         root=tmp_path)
+    recB = LedgerRecord(
+        report=ReviewReport(summary="s", instance="local", model="m", run_id="20260629T120000Z",
+                            sessions_reviewed=["sessB1"]),
+        gaps=[GapRecord(gap=SkillGap(title="x", target_skill="y"))],
+        trigger="manual", created_at="2026-06-29T12:00:00Z",
+    )
+    L.write_run(recB, root=tmp_path)
+
+    hist = L.applied_history("local", root=tmp_path)
+    assert len(hist) == 1                                # only the applied gap
+    assert hist[0] == {"skill": "obsidian", "title": "patch loop", "applied_at": "2026-06-30T12:05:00Z"}
+
+    # only sessA1 (cited in the APPLIED gap's evidence) is "acted on" — NOT sessA2 (its gap was skipped)
+    assert L.reviewed_session_ids("local", root=tmp_path) == {"sessA1"}
+
+
+def test_applied_history_falls_back_when_applied_at_empty(tmp_path):
+    from backend.models import ApplyOutcome
+    L.write_run(LedgerRecord(
+        report=ReviewReport(summary="s", instance="local", model="m", run_id="20260630T120000Z"),
+        gaps=[GapRecord(gap=SkillGap(title="t", target_skill="obsidian"))],
+        trigger="manual", created_at="2026-06-30T12:00:00Z",
+    ), root=tmp_path)
+    # outcome with NO applied_at (legacy/corrupt) -> date must not be unknown
+    L.update_gap_outcome("local", "20260630T120000Z", 0,
+                         ApplyOutcome(gap_index=0, status="applied", applied_at=""), root=tmp_path)
+    hist = L.applied_history("local", root=tmp_path)
+    assert hist[0]["applied_at"] == "2026-06-30T12:00:00Z"   # fell back to the run's finished_at

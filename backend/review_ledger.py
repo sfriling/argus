@@ -123,6 +123,48 @@ def update_gap_outcome(instance: str, run_id: str, gap_index: int, outcome: Appl
         return rec
 
 
+def applied_history(instance: str, *, runs_limit: int = 20, root: Path | None = None) -> list[dict]:
+    """Recent APPLIED edits as {skill, title, applied_at}, newest-first, deduped by (skill, title)
+    keeping the LATEST application. Falls back to the run's finished_at when an outcome has no
+    applied_at (so an edit's date is never unknown). Feeds the reviewer so it doesn't re-propose a
+    fix it already landed — unless a session AFTER the fix shows it regressed."""
+    best: dict = {}
+    for entry in list_runs(instance, limit=runs_limit, root=root):
+        if entry.applied_count == 0:
+            continue
+        rec = read_run(instance, entry.run_id, root=root)
+        if rec is None:
+            continue
+        for g in rec.gaps:
+            o = g.outcome
+            if o and o.status == "applied":
+                key = (g.gap.target_skill, g.gap.title)
+                when = o.applied_at or entry.finished_at or entry.started_at or ""
+                cur = best.get(key)
+                if cur is None or when > cur["applied_at"]:
+                    best[key] = {"skill": g.gap.target_skill, "title": g.gap.title, "applied_at": when}
+    return sorted(best.values(), key=lambda d: d["applied_at"], reverse=True)
+
+
+def reviewed_session_ids(instance: str, *, runs_limit: int = 20, root: Path | None = None) -> set:
+    """Session ids whose OWN gap was actually applied (cited in the applied gap's evidence) — only
+    these struggles were truly acted on, so triage favors them last. A session reviewed-but-skipped
+    in a run that applied a DIFFERENT gap is NOT demoted (its problem is still open)."""
+    out: set = set()
+    for entry in list_runs(instance, limit=runs_limit, root=root):
+        if entry.applied_count == 0:
+            continue
+        rec = read_run(instance, entry.run_id, root=root)
+        if rec is None:
+            continue
+        reviewed = [s for s in rec.report.sessions_reviewed if s]
+        for g in rec.gaps:
+            if g.outcome and g.outcome.status == "applied":
+                ev = g.gap.evidence or ""
+                out.update(sid for sid in reviewed if sid in ev)
+    return out
+
+
 def save_backup(instance: str, skill_path: str, content: bytes, now: datetime,
                 *, root: Path | None = None) -> str:
     """Persist the prior bytes of a SKILL.md OUTSIDE the synced skills tree (R8), under the Argus

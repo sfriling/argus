@@ -106,7 +106,8 @@ def create_app(config=None, aggregator=None) -> FastAPI:
             runner = make_runner(inst)
             events = sr.read_trajectory(runner, inst)
             sessions = collect_sessions(runner, inst, limit=12)
-            ids = sr.triage(events, sessions, limit=3)
+            reviewed = ledger.reviewed_session_ids(instance)
+            ids = sr.triage(events, sessions, limit=3, reviewed_sids=reviewed)
             skills, names, custom = sr.gather_skills(runner, inst)
 
             # cross-instance drift (deterministic, no LLM)
@@ -121,7 +122,8 @@ def create_app(config=None, aggregator=None) -> FastAPI:
             drift = sr.skill_drift(per_inst)
 
             memory = sr.gather_memory(runner, inst)
-            context = sr.assemble(runner, inst, ids, skills, names, memory=memory)
+            applied = ledger.applied_history(instance)
+            context = sr.assemble(runner, inst, ids, skills, names, memory=memory, applied=applied)
             now_iso = datetime.now(timezone.utc).isoformat()
             report = sr.review(context, agg.config.skill_review_model, anthropic_key(agg.config),
                                instance, ids, now_iso, claude_bin=agg.config.claude_bin)

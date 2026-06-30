@@ -9,7 +9,15 @@ import sys
 from backend.skill_review import (
     triage, skill_drift, report_from_tool_input, review,
     build_cli_prompt, parse_cli_result, gather_memory, assemble, skills_root_for,
+    _session_when,
 )
+
+
+def test_session_when_full_timestamp():
+    # full timestamp (not just date) so same-day regressions are decidable
+    assert _session_when("20260629_093238_06533f") == "2026-06-29 09:32:38"
+    assert _session_when("20260629_only_date") == "2026-06-29"   # degrade gracefully
+    assert _session_when("not-a-dated-id") == ""
 
 
 def test_skills_root_resolves_profile_dir():
@@ -52,6 +60,19 @@ def test_triage_ranks_strugglers_first():
 def test_triage_no_trajectory_uses_recent():
     out = triage([], [_sess("a"), _sess("b"), _sess("c")], limit=2)
     assert out == ["a", "b"]
+
+
+def test_triage_fresh_struggle_outranks_acted_on_even_if_smaller():
+    # the HIGH bug: a heavy already-fixed struggler must NOT crowd out a fresh (lighter) regression.
+    events = [
+        {"session_id": "old", "action": "rejected", "attempt": 2},   # loop-break=3, but already acted on
+        {"session_id": "old", "action": "rejected", "attempt": 2},   # (old is a heavy 2x struggler)
+        {"session_id": "new", "action": "inferred"},                 # fresh, lighter (score 1)
+    ]
+    out = triage(events, [_sess("old"), _sess("new")], limit=1, reviewed_sids={"old"})
+    assert out == ["new"]               # not-yet-acted-on wins the only slot, regression surfaces
+    # without the reviewed set, the heavy struggler wins as before
+    assert triage(events, [_sess("old"), _sess("new")], limit=1)[0] == "old"
 
 
 # --- drift (pure) ------------------------------------------------------------
@@ -152,6 +173,16 @@ def test_assemble_includes_memory_with_unsynced_note():
     assert "Profile memory" in ctx
     assert "remember X" in ctx
     assert "not synced" in ctx.lower()   # the path-aware caveat is present
+
+
+def test_assemble_includes_applied_history_with_timing_rule():
+    class R:
+        def run(self, a, timeout=8):
+            return RunResult(ok=False)
+    ctx = assemble(R(), _Inst(), [], {}, ["s1"],
+                   applied=[{"skill": "obsidian", "title": "patch loop", "applied_at": "2026-06-30T12:00:00Z"}])
+    assert "Already addressed" in ctx
+    assert "obsidian" in ctx and "patch loop" in ctx and "2026-06-30T12:00:00Z" in ctx
 
 
 def test_build_cli_prompt_has_schema():
