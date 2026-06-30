@@ -28,6 +28,7 @@ const runningJob: ReviewJob = {
 beforeEach(() => {
   vi.mocked(api.fetchStatus).mockResolvedValue(doneJob);
   vi.mocked(api.runReview).mockResolvedValue(runningJob);
+  vi.mocked(api.listRuns).mockResolvedValue([]);
 });
 
 describe('ReviewTab', () => {
@@ -39,6 +40,16 @@ describe('ReviewTab', () => {
     expect(screen.getByText(/Patch checklist/)).toBeInTheDocument();         // suggested edit
     expect(screen.getByText(/subtle append guidance/)).toBeInTheDocument();  // health
     expect(screen.getByText(/not on every instance/)).toBeInTheDocument();   // drift
+  });
+
+  it('shows past reviews from the ledger', async () => {
+    vi.mocked(api.listRuns).mockResolvedValue([
+      { run_id: '20260630T120000Z', instance: 'local', started_at: '', finished_at: '',
+        status: 'done', model: 'm', trigger: 'scheduled', gap_count: 3, applied_count: 1 },
+    ]);
+    render(<ReviewTab instances={['local']} />);
+    expect(await screen.findByText('scheduled')).toBeInTheDocument();
+    expect(screen.getByText(/3 gaps · 1 applied/)).toBeInTheDocument();
   });
 
   it('runs a review on click', async () => {

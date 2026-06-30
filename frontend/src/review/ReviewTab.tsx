@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ReviewJob, SkillGap } from '../types';
-import { runReview, fetchStatus } from './api';
+import type { ReviewJob, SkillGap, LedgerIndexEntry } from '../types';
+import { runReview, fetchStatus, listRuns } from './api';
 
 function elapsed(fromIso: string): string {
   if (!fromIso) return '';
@@ -43,9 +43,15 @@ export function ReviewTab({ instances }: { instances: string[] }) {
   const [job, setJob] = useState<ReviewJob | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, tick] = useState(0); // re-render so the elapsed timer advances
+  const [runs, setRuns] = useState<LedgerIndexEntry[]>([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const running = job?.status === 'running';
+
+  // Past reviews come from the persistent ledger — reload on instance change and when a run finishes.
+  useEffect(() => {
+    listRuns(instance).then(setRuns).catch(() => {});
+  }, [instance, job?.status]);
 
   // Hydrate from server-side job state on mount + while a run is in flight,
   // so an in-progress review shows up even after navigating away and back.
@@ -168,6 +174,24 @@ export function ReviewTab({ instances }: { instances: string[] }) {
         <p className="text-sm" style={{ color: '#52525b' }}>
           No review for <span style={{ color: '#a1a1aa' }}>{instance}</span> yet. Click “Run review” to start.
         </p>
+      )}
+
+      {runs.length > 0 && (
+        <Section label="Past reviews">
+          <div className="space-y-1.5">
+            {runs.map((r) => (
+              <div key={r.run_id} className="rounded-lg px-3 py-2 text-sm flex items-center gap-2"
+                style={{ background: '#0a0a0b' }}>
+                <span className="text-xs px-1.5 py-0.5 rounded-md"
+                  style={{ color: r.trigger === 'scheduled' ? '#38bdf8' : '#a1a1aa', background: '#ffffff10' }}>
+                  {r.trigger}
+                </span>
+                <span style={{ color: '#a1a1aa' }}>{r.gap_count} gaps · {r.applied_count} applied</span>
+                <span className="ml-auto text-xs font-mono" style={{ color: '#3f3f46' }}>{r.run_id}</span>
+              </div>
+            ))}
+          </div>
+        </Section>
       )}
     </div>
   );

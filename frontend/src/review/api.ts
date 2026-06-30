@@ -1,4 +1,11 @@
-import type { ReviewJob } from '../types';
+import type { ReviewJob, LedgerIndexEntry } from '../types';
+
+/** Past review runs for an instance (newest first), from the persistent ledger. */
+export async function listRuns(instance: string): Promise<LedgerIndexEntry[]> {
+  const res = await fetch(`/api/skill-review/${encodeURIComponent(instance)}/runs`);
+  if (!res.ok) return [];
+  return res.json();
+}
 
 /** Start a review. Returns the job in its initial "running" state (the work
  *  continues server-side). Throws on 403 (disabled) / 409 (already running). */

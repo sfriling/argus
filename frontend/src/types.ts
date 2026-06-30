@@ -157,6 +157,18 @@ export type ReviewReport = {
   drift: DriftItem[];
 };
 
+export type LedgerIndexEntry = {
+  run_id: string;
+  instance: string;
+  started_at: string;
+  finished_at: string;
+  status: string;
+  model: string;
+  trigger: string;
+  gap_count: number;
+  applied_count: number;
+};
+
 export type ReviewJob = {
   status: 'idle' | 'running' | 'done' | 'error';
   instance: string;
