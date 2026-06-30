@@ -24,7 +24,8 @@ from backend import kanban_actions
 from backend import session_detail
 from backend import skill_review as sr
 from backend.collectors.sessions import collect_sessions
-from backend.models import Features, ReviewJob
+from backend import review_ledger as ledger
+from backend.models import Features, GapRecord, LedgerRecord, ReviewJob
 from backend.transport import make_runner
 
 
@@ -116,6 +117,17 @@ def create_app(config=None, aggregator=None) -> FastAPI:
             report = sr.review(context, agg.config.skill_review_model, anthropic_key(agg.config),
                                instance, ids, now_iso, claude_bin=agg.config.claude_bin)
             report.drift = drift
+            report.run_id = report.run_id or ledger.new_run_id(datetime.now(timezone.utc))
+            report.trigger = "manual"
+            try:
+                ledger.write_run(LedgerRecord(
+                    report=report,
+                    gaps=[GapRecord(gap=g) for g in report.gaps],
+                    trigger=report.trigger,
+                    created_at=datetime.now(timezone.utc).isoformat(),
+                ))
+            except Exception:
+                pass     # ledger persistence must never fail the in-memory result
             with review_lock:
                 app.state.review_job = ReviewJob(
                     status="done", instance=instance, started_at=started_at,
@@ -159,6 +171,19 @@ def create_app(config=None, aggregator=None) -> FastAPI:
         # back-compat: the report from the most recent completed run, or null
         job = getattr(app.state, "review_job", None)
         return job.report if job and job.status == "done" else None
+
+    @app.get("/api/skill-review/{instance}/runs")
+    def skill_review_runs(instance: str):
+        _instance_or_404(instance)
+        return ledger.list_runs(instance)
+
+    @app.get("/api/skill-review/{instance}/runs/{run_id}")
+    def skill_review_run_detail(instance: str, run_id: str):
+        _instance_or_404(instance)
+        rec = ledger.read_run(instance, run_id)
+        if rec is None:
+            raise HTTPException(status_code=404, detail="run not found")
+        return rec
 
     @app.get("/api/sessions/{instance}/{session_id}")
     def session_drilldown(instance: str, session_id: str):

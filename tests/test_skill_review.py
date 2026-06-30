@@ -243,6 +243,28 @@ def test_run_conflict_when_already_running(monkeypatch):
     gate.set()   # let the first finish so the thread doesn't dangle
 
 
+def test_review_persisted_to_ledger(monkeypatch, tmp_path):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
+    monkeypatch.setattr("backend.review_ledger.reviews_state_dir", lambda: tmp_path)
+    cfg = AppConfig(instances=[Instance(name="local", transport="local", hermes_home="/h")],
+                    enable_skill_review=True)
+    client = _client(monkeypatch, cfg)
+    monkeypatch.setattr("backend.app.sr.review",
+                        lambda *a, **k: ReviewReport(summary="mocked", model="m", instance="local"))
+    assert client.post("/api/skill-review/local/run").status_code == 200
+    import time
+    for _ in range(50):
+        if client.get("/api/skill-review/status").json()["status"] != "running":
+            break
+        time.sleep(0.05)
+    runs = client.get("/api/skill-review/local/runs").json()
+    assert len(runs) == 1 and runs[0]["instance"] == "local" and runs[0]["trigger"] == "manual"
+    rid = runs[0]["run_id"]
+    rec = client.get(f"/api/skill-review/local/runs/{rid}").json()
+    assert rec["report"]["summary"] == "mocked"
+    assert client.get("/api/skill-review/local/runs/nope").status_code == 404
+
+
 def test_overview_exposes_skill_review_feature(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
     cfg = AppConfig(instances=[], enable_skill_review=True)
