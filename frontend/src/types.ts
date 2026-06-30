@@ -204,6 +204,12 @@ export type ReviewJob = {
   report: ReviewReport | null;
 };
 
+export type ScheduleConfig = {
+  enabled: boolean;
+  time?: string | null;            // daily "HH:MM" (local)
+  interval_hours?: number | null;  // or every N hours
+};
+
 export type ConfigInstance = {
   name: string;
   transport: 'local' | 'ssh';
@@ -213,6 +219,8 @@ export type ConfigInstance = {
   ssh?: string | null;
   ssh_key?: string | null;
   reliability_log?: string | null;
+  synced_skills?: boolean;
+  schedule?: ScheduleConfig | null;
 };
 
 export type ArgusConfig = {

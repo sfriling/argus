@@ -55,4 +55,20 @@ describe('SettingsView', () => {
     fireEvent.click(screen.getByText('Confirm save'));
     expect(onSave.mock.calls[0][0].instances.length).toBe(2);
   });
+
+  it('schedule editor: enabling sets a default daily schedule and saves it', () => {
+    const onSave = vi.fn();
+    render(<SettingsView data={makeData(true)} onSave={onSave} onClose={() => {}} />);
+    // toggle the auto-review checkbox -> default daily 09:00 appears
+    fireEvent.click(screen.getByRole('checkbox'));
+    expect(screen.getByDisplayValue('09:00')).toBeInTheDocument();
+    // switch to interval mode
+    fireEvent.change(screen.getByDisplayValue('Daily at'), { target: { value: 'interval' } });
+    expect(screen.getByText('hours')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Save changes'));
+    fireEvent.click(screen.getByText('Confirm save'));
+    const saved = onSave.mock.calls[0][0].instances[0].schedule;
+    expect(saved.enabled).toBe(true);
+    expect(saved.interval_hours).toBe(6);
+  });
 });

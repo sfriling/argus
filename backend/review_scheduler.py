@@ -69,8 +69,10 @@ def start_scheduler(get_config, start_review, get_last_runs, *, available: bool,
     ARGUS_SCHEDULER env isn't 'off' (tests pass it off / configure no schedule)."""
     if os.environ.get("ARGUS_SCHEDULER", "").lower() == "off":
         return None, None
-    cfg = get_config()
-    if not available or not has_enabled_schedule(cfg):
+    # Start whenever reviews are available — the loop reads config live each tick, so a schedule
+    # enabled later (e.g. via the Settings UI) is picked up without an Argus restart. Idle when
+    # no schedule is set (due_instances returns []).
+    if not available:
         return None, None
     stop = threading.Event()
     sched = ReviewScheduler(get_config, start_review, get_last_runs, stop, tick=tick)

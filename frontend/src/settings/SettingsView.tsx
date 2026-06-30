@@ -1,14 +1,52 @@
 import { useState } from 'react';
-import type { ArgusConfig, ConfigInstance, ConfigResponse } from '../types';
+import type { ArgusConfig, ConfigInstance, ConfigResponse, ScheduleConfig } from '../types';
 
 const FIELD =
   'w-full text-sm rounded-md px-2 py-1.5 border bg-transparent outline-none';
+const SFIELD = 'text-sm rounded-md px-2 py-1.5 border bg-transparent outline-none';   // not full-width
 const FIELD_STYLE = { background: '#0a0a0b', borderColor: '#27272a', color: '#e4e4e7' };
 const LABEL = 'text-xs uppercase tracking-wider';
 const LABEL_STYLE = { color: '#52525b' };
 
 function blankInstance(): ConfigInstance {
   return { name: '', transport: 'local', profile: 'default', hermes_home: '', hermes_bin: 'hermes' };
+}
+
+function ScheduleEditor({ schedule, writable, onChange }:
+  { schedule?: ScheduleConfig | null; writable: boolean; onChange: (s: ScheduleConfig | null) => void }) {
+  const enabled = !!schedule?.enabled;
+  const mode: 'time' | 'interval' = schedule?.interval_hours != null ? 'interval' : 'time';
+  return (
+    <div className="mt-2 pt-2" style={{ borderTop: '1px solid #1f1f23' }}>
+      <label className="flex items-center gap-2 text-xs" style={{ color: '#a1a1aa' }}>
+        <input type="checkbox" disabled={!writable} checked={enabled}
+          onChange={(e) => onChange(e.target.checked ? { enabled: true, time: '09:00' } : null)} />
+        Auto-review on a schedule <span style={{ color: '#52525b' }}>(read-only reviews)</span>
+      </label>
+      {enabled && (
+        <div className="flex items-center gap-2 mt-2">
+          <select className={SFIELD} style={FIELD_STYLE} disabled={!writable} value={mode}
+            onChange={(e) => onChange(e.target.value === 'interval'
+              ? { enabled: true, interval_hours: 6 } : { enabled: true, time: '09:00' })}>
+            <option value="time">Daily at</option>
+            <option value="interval">Every</option>
+          </select>
+          {mode === 'time' ? (
+            <input className={SFIELD} style={FIELD_STYLE} type="time" disabled={!writable}
+              value={schedule?.time ?? '09:00'}
+              onChange={(e) => onChange({ enabled: true, time: e.target.value })} />
+          ) : (
+            <>
+              <input className={SFIELD} style={{ ...FIELD_STYLE, width: '5rem' }} type="number" min={1}
+                disabled={!writable} value={schedule?.interval_hours ?? 6}
+                onChange={(e) => onChange({ enabled: true, interval_hours: Number(e.target.value) })} />
+              <span className="text-xs" style={{ color: '#52525b' }}>hours</span>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 type Props = {
@@ -175,6 +213,11 @@ export function SettingsView({ data, onSave, onClose, saving, error }: Props) {
                 </>
               )}
             </div>
+            <ScheduleEditor
+              schedule={inst.schedule}
+              writable={writable}
+              onChange={(s) => patchInstance(i, { schedule: s })}
+            />
           </div>
         ))}
         {cfg.instances.length === 0 && (

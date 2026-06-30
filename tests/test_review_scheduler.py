@@ -54,9 +54,12 @@ def test_start_scheduler_guards(monkeypatch):
     s, stop = start_scheduler(lambda: cfg, lambda *a: None, lambda: {}, available=True)
     assert s is None
     monkeypatch.delenv("ARGUS_SCHEDULER", raising=False)
-    # no enabled schedule -> no thread
-    s, stop = start_scheduler(lambda: _cfg(), lambda *a: None, lambda: {}, available=True)
-    assert s is None
+    # available but NO schedule yet -> daemon still starts (idle), so a schedule enabled later
+    # (e.g. via the Settings UI) is picked up live. Stop it.
+    s, stop = start_scheduler(lambda: _cfg(), lambda *a: None, lambda: {}, available=True, tick=600)
+    assert s is not None
+    stop.set()
+    s.join(timeout=2)
     # available + schedule + env ok -> starts; stop it immediately
     s, stop = start_scheduler(lambda: cfg, lambda *a: calls.__setitem__("n", calls["n"] + 1),
                               lambda: {"local": None}, available=True, tick=600)
