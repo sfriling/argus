@@ -132,6 +132,18 @@ def gather_skills(runner, instance, max_custom: int = 8) -> tuple[dict[str, str]
     return contents, names, {n for n, _ in custom}
 
 
+def gather_memory(runner, instance, max_profiles: int = 6, cap: int = 2500) -> dict[str, str]:
+    """Per-profile MEMORY.md for this instance. Memory is intentionally NOT synced across
+    machines (file paths differ), so this is always read per-instance via its own runner."""
+    home = instance.hermes_home.rstrip("/\\")
+    out: dict[str, str] = {}
+    for p in (runner.list_dir(f"{home}/profiles") or [])[:max_profiles]:
+        text = runner.read(f"{home}/profiles/{p}/memories/MEMORY.md")
+        if text and text.strip():
+            out[p] = text[:cap]
+    return out
+
+
 def _condense_transcript(export_text: str, max_chars: int = 3500) -> str:
     """A compact, struggle-focused view: title + tool calls + tool ERRORS (the loop evidence),
     with prose kept brief. Tool errors matter most, so they're never dropped first."""
@@ -152,7 +164,8 @@ def _condense_transcript(export_text: str, max_chars: int = 3500) -> str:
     return out[:max_chars]
 
 
-def assemble(runner, instance, session_ids: list[str], skills: dict[str, str], all_names: list[str]) -> str:
+def assemble(runner, instance, session_ids: list[str], skills: dict[str, str], all_names: list[str],
+             memory: dict[str, str] | None = None) -> str:
     parts = ["# Hermes sessions that struggled (most → least)"]
     for sid in session_ids:
         r = runner.run(["sessions", "export", "--session-id", sid, "-"], timeout=25)
@@ -161,6 +174,12 @@ def assemble(runner, instance, session_ids: list[str], skills: dict[str, str], a
     parts.append("\n\n# Current custom skills (full content)")
     for name, content in skills.items():
         parts.append(f"\n## SKILL: {name}\n{content}")
+    if memory:
+        parts.append("\n\n# Profile memory on THIS instance (per profile)\n"
+                     "(Memory is per-machine and intentionally NOT synced — file paths differ "
+                     "between machines. Do NOT propose syncing memory or flag path differences as drift.)")
+        for prof, mem in memory.items():
+            parts.append(f"\n## MEMORY [{prof}]\n{mem}")
     parts.append(f"\n\n# All installed skill names\n{', '.join(all_names)}")
     return "\n".join(parts)
 
@@ -168,12 +187,15 @@ def assemble(runner, instance, session_ids: list[str], skills: dict[str, str], a
 # --- Claude review -----------------------------------------------------------
 
 SYSTEM = (
-    "You are a senior reviewer improving a Hermes agent's skills. You are given transcripts of "
-    "sessions where the agent STRUGGLED, plus the agent's current skills. Diagnose the ROOT cause "
-    "from the evidence (don't guess). Prefer HARDENING an existing skill over inventing a new one; "
-    "only propose a new skill for a genuine, unaddressed gap. For each gap give concrete, minimal "
-    "suggested edit text. Also flag any existing skill that is stale, inaccurate, or contradictory. "
-    "Be precise and evidence-based; cite the session id. Call submit_review exactly once."
+    "You are a senior reviewer improving a Hermes agent. You are given transcripts of sessions "
+    "where the agent STRUGGLED, plus the agent's current custom skills AND its per-profile memory "
+    "(MEMORY.md). Diagnose the ROOT cause from the evidence (don't guess). Prefer HARDENING an "
+    "existing skill over inventing a new one; only propose a new skill for a genuine, unaddressed "
+    "gap. For each gap give concrete, minimal suggested edit text. Also flag stale, inaccurate, or "
+    "contradictory entries in EITHER the skills OR the memory. Memory is per-machine and "
+    "intentionally unsynced (file paths differ between machines) — never suggest syncing memory or "
+    "treat path differences as a problem. Be precise and evidence-based; cite the session id. Call "
+    "submit_review exactly once."
 )
 
 REVIEW_TOOL = {

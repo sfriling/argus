@@ -111,7 +111,8 @@ def create_app(config=None, aggregator=None) -> FastAPI:
                     pass
         drift = sr.skill_drift(per_inst)
 
-        context = sr.assemble(runner, inst, ids, skills, names)
+        memory = sr.gather_memory(runner, inst)
+        context = sr.assemble(runner, inst, ids, skills, names, memory=memory)
         now_iso = datetime.now(timezone.utc).isoformat()
         try:
             report = sr.review(context, agg.config.skill_review_model, anthropic_key(agg.config),

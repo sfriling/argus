@@ -8,7 +8,7 @@ import sys
 
 from backend.skill_review import (
     triage, skill_drift, report_from_tool_input, review,
-    build_cli_prompt, parse_cli_result,
+    build_cli_prompt, parse_cli_result, gather_memory, assemble,
 )
 from backend.transport import RunResult
 
@@ -114,6 +114,32 @@ def test_skill_review_available_truth_table(monkeypatch):
     assert skill_review_available(on_cli) is True
 
 
+class _Inst:
+    hermes_home = "/h"
+
+
+def test_gather_memory_per_profile():
+    class R:
+        def list_dir(self, path, timeout=8):
+            return ["orchestrator", "executor"]
+        def read(self, path, timeout=8):
+            return "orchestrator memory facts" if "orchestrator" in path else ""
+        def run(self, args, timeout=8):
+            return RunResult(ok=False)
+    m = gather_memory(R(), _Inst())
+    assert m == {"orchestrator": "orchestrator memory facts"}   # empty executor memory skipped
+
+
+def test_assemble_includes_memory_with_unsynced_note():
+    class R:
+        def run(self, args, timeout=8):
+            return RunResult(ok=False)   # no session exports needed for this check
+    ctx = assemble(R(), _Inst(), [], {}, ["s1"], memory={"orchestrator": "remember X"})
+    assert "Profile memory" in ctx
+    assert "remember X" in ctx
+    assert "not synced" in ctx.lower()   # the path-aware caveat is present
+
+
 def test_build_cli_prompt_has_schema():
     p = build_cli_prompt("THE CONTEXT")
     assert "JSON object" in p and "THE CONTEXT" in p
@@ -149,6 +175,8 @@ def _client(monkeypatch, cfg, run_result=None):
             return run_result or RunResult(ok=True, stdout="")
         def read(self, path, timeout=8):
             return None
+        def list_dir(self, path, timeout=8):
+            return []
     monkeypatch.setattr("backend.app.make_runner", lambda inst: _Runner())
     return TestClient(create_app(config=cfg, aggregator=StubAgg()))
 
