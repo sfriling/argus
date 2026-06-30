@@ -17,6 +17,11 @@ export function proposeEdit(instance: string, run_id: string, gap_index: number)
   return postJson(`/api/skill-review/${encodeURIComponent(instance)}/propose-edit`, { run_id, gap_index });
 }
 
+/** Generate a proposed full-file rewrite addressing a skill-HEALTH finding. */
+export function proposeHealthEdit(instance: string, run_id: string, health_index: number): Promise<ProposedEdit> {
+  return postJson(`/api/skill-review/${encodeURIComponent(instance)}/propose-edit`, { run_id, health_index });
+}
+
 /** Apply a previously-proposed edit (the server writes its own stored bytes). */
 export function applyEdit(instance: string, proposal_id: string): Promise<ApplyOutcome> {
   return postJson(`/api/skill-review/${encodeURIComponent(instance)}/apply-edit`, { proposal_id });

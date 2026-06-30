@@ -162,6 +162,7 @@ export type ReviewReport = {
 export type ProposedEdit = {
   proposal_id: string;
   run_id: string;
+  kind: string;          // "gap" | "health"
   gap_index: number;
   skill_name: string;
   path: string;
@@ -188,9 +189,15 @@ export type GapRecord = {
   outcome: ApplyOutcome | null;
 };
 
+export type HealthRecord = {
+  health: SkillHealth;
+  outcome: ApplyOutcome | null;
+};
+
 export type LedgerRecord = {
   report: ReviewReport;
   gaps: GapRecord[];
+  health: HealthRecord[];
   trigger: string;
   created_at: string;
 };

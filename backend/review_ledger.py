@@ -165,6 +165,18 @@ def reviewed_session_ids(instance: str, *, runs_limit: int = 20, root: Path | No
     return out
 
 
+def update_health_outcome(instance: str, run_id: str, health_index: int, outcome: ApplyOutcome,
+                          *, root: Path | None = None) -> LedgerRecord | None:
+    """Record the apply outcome of a skill-HEALTH fix (parallel to update_gap_outcome)."""
+    with _INDEX_LOCK:
+        rec = read_run(instance, run_id, root=root)
+        if rec is None or health_index < 0 or health_index >= len(rec.health):
+            return None
+        rec.health[health_index].outcome = outcome
+        _atomic_write_json(_instance_dir(root, instance) / f"{run_id}.json", rec.model_dump())
+        return rec
+
+
 def save_backup(instance: str, skill_path: str, content: bytes, now: datetime,
                 *, root: Path | None = None) -> str:
     """Persist the prior bytes of a SKILL.md OUTSIDE the synced skills tree (R8), under the Argus

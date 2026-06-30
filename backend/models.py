@@ -175,12 +175,18 @@ class GapRecord(BaseModel):
     outcome: ApplyOutcome | None = None
 
 
+class HealthRecord(BaseModel):
+    health: SkillHealth
+    outcome: ApplyOutcome | None = None
+
+
 class ProposedEdit(BaseModel):
     """A pending full-file rewrite the user reviews before applying. The proposed bytes are
     stored SERVER-side (keyed by proposal_id, R4) — never echoed by the client."""
     proposal_id: str = ""
     run_id: str = ""
-    gap_index: int = 0
+    kind: str = "gap"             # "gap" | "health"
+    gap_index: int = 0            # index into gaps OR health, per `kind`
     skill_name: str = ""
     path: str = ""
     is_new: bool = False
@@ -206,6 +212,7 @@ class LedgerIndexEntry(BaseModel):
 class LedgerRecord(BaseModel):
     report: ReviewReport
     gaps: list[GapRecord] = Field(default_factory=list)
+    health: list[HealthRecord] = Field(default_factory=list)
     trigger: str = "manual"
     created_at: str = ""
 

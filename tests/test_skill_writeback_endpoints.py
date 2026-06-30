@@ -4,7 +4,9 @@ from fastapi.testclient import TestClient
 
 from backend.app import create_app
 from backend.config import AppConfig, Instance
-from backend.models import GapRecord, LedgerRecord, Overview, ReviewReport, SkillGap
+from backend.models import (
+    GapRecord, HealthRecord, LedgerRecord, Overview, ReviewReport, SkillGap, SkillHealth,
+)
 from backend import review_ledger as ledger
 from backend.transport import RunResult, WriteResult
 
@@ -54,14 +56,31 @@ def _client(monkeypatch, tmp_path, *, writeback=True, bind="127.0.0.1"):
         def get(self, *a, **k): return Overview()
 
     client = TestClient(create_app(config=cfg, aggregator=StubAgg()))
-    # seed a completed run with one gap into the ledger
+    # seed a completed run with one gap AND one health finding into the ledger
+    health = SkillHealth(skill="myskill", finding="legacy <EOM> instruction", severity="warn")
     ledger.write_run(LedgerRecord(
-        report=ReviewReport(summary="s", instance="local", model="m", run_id="20260630T120000Z"),
+        report=ReviewReport(summary="s", instance="local", model="m", run_id="20260630T120000Z",
+                            health=[health]),
         gaps=[GapRecord(gap=SkillGap(title="harden", target_skill="myskill",
                                      recommendation="add a rule", suggested_edit="..."))],
+        health=[HealthRecord(health=health)],
         trigger="manual", created_at=datetime.now(timezone.utc).isoformat(),
     ), root=tmp_path / "reviews")
     return client, runner
+
+
+def test_propose_then_apply_health_fix(monkeypatch, tmp_path):
+    client, runner = _client(monkeypatch, tmp_path)
+    p = client.post("/api/skill-review/local/propose-edit",
+                    json={"run_id": "20260630T120000Z", "health_index": 0})
+    assert p.status_code == 200, p.text
+    pid = p.json()["proposal_id"]
+    assert p.json()["skill_name"] == "myskill"
+    a = client.post("/api/skill-review/local/apply-edit", json={"proposal_id": pid})
+    assert a.status_code == 200 and a.json()["status"] == "applied"
+    # the health item's outcome is recorded in the ledger (so the UI can show it applied)
+    rec = client.get("/api/skill-review/local/runs/20260630T120000Z").json()
+    assert rec["health"][0]["outcome"]["status"] == "applied"
 
 
 def test_writeback_gated_off_returns_403(monkeypatch, tmp_path):

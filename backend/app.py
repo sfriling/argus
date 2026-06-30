@@ -30,7 +30,9 @@ from uuid import uuid4
 from backend import review_ledger as ledger
 from backend import skill_writeback as wb
 from backend.review_scheduler import start_scheduler
-from backend.models import Features, GapRecord, LedgerRecord, ProposedEdit, ReviewJob
+from backend.models import (
+    Features, GapRecord, HealthRecord, LedgerRecord, ProposedEdit, ReviewJob, SkillGap,
+)
 from backend.transport import make_runner
 
 
@@ -134,6 +136,7 @@ def create_app(config=None, aggregator=None) -> FastAPI:
                 ledger.write_run(LedgerRecord(
                     report=report,
                     gaps=[GapRecord(gap=g) for g in report.gaps],
+                    health=[HealthRecord(health=h) for h in report.health],
                     trigger=report.trigger,
                     created_at=datetime.now(timezone.utc).isoformat(),
                 ))
@@ -216,11 +219,23 @@ def create_app(config=None, aggregator=None) -> FastAPI:
         inst = _instance_or_404(instance)
         _writeback_gate()
         run_id = str(body.get("run_id") or "")
-        gap_index = int(body.get("gap_index") or 0)
         rec = ledger.read_run(instance, run_id)
-        if rec is None or gap_index < 0 or gap_index >= len(rec.gaps):
-            raise HTTPException(status_code=404, detail="run or gap not found")
-        gap = rec.gaps[gap_index].gap
+        if rec is None:
+            raise HTTPException(status_code=404, detail="run not found")
+        # A fixable item is either a GAP (rec.gaps[i]) or a HEALTH finding (rec.report.health[i]).
+        if body.get("health_index") is not None:
+            hi = int(body["health_index"])
+            if hi < 0 or hi >= len(rec.report.health):
+                raise HTTPException(status_code=404, detail="health item not found")
+            h = rec.report.health[hi]
+            gap = SkillGap(title=f"health: {h.finding[:60]}", target_skill=h.skill, recommendation=h.finding)
+            kind, item_index = "health", hi
+        else:
+            gi = int(body.get("gap_index") or 0)
+            if gi < 0 or gi >= len(rec.gaps):
+                raise HTTPException(status_code=404, detail="gap not found")
+            gap = rec.gaps[gi].gap
+            kind, item_index = "gap", gi
         runner = make_runner(inst)
         is_new = gap.target_skill.strip().lower() == "new"
         _, all_names, _ = sr.gather_skills(runner, inst)
@@ -228,7 +243,7 @@ def create_app(config=None, aggregator=None) -> FastAPI:
             path = wb.new_skill_path(inst, str(body.get("new_skill_name") or ""))
             if path is None:
                 raise HTTPException(status_code=422, detail="new skill requires a valid name")
-            cur, full, old_sha = None, "", ""
+            full, old_sha = "", ""
         else:
             path = wb.resolve_skill_path(runner, inst, gap.target_skill, all_names)
             if path is None:
@@ -245,10 +260,10 @@ def create_app(config=None, aggregator=None) -> FastAPI:
         proposal_id = uuid4().hex
         app.state.proposals[proposal_id] = {
             "new_bytes": new_content.encode("utf-8"), "path": path, "old_sha": old_sha,
-            "gap_index": gap_index, "run_id": run_id, "is_new": is_new, "instance": instance,
+            "kind": kind, "index": item_index, "run_id": run_id, "is_new": is_new, "instance": instance,
         }
         return ProposedEdit(
-            proposal_id=proposal_id, run_id=run_id, gap_index=gap_index, skill_name=gap.target_skill,
+            proposal_id=proposal_id, run_id=run_id, kind=kind, gap_index=item_index, skill_name=gap.target_skill,
             path=path, is_new=is_new, old_sha256=old_sha, diff=wb.compute_diff(full, new_content, path),
             change_note=note, warnings=warnings, injection_flags=wb.injection_scan(full, new_content),
         )
@@ -265,9 +280,12 @@ def create_app(config=None, aggregator=None) -> FastAPI:
         def _save_backup(cur_bytes: bytes) -> str:
             return ledger.save_backup(instance, prop["path"], cur_bytes, datetime.now(timezone.utc))
 
-        outcome = wb.apply_edit(runner, prop["gap_index"], prop["path"], prop["old_sha"],
+        outcome = wb.apply_edit(runner, prop["index"], prop["path"], prop["old_sha"],
                                 prop["new_bytes"], is_new=prop["is_new"], save_backup=_save_backup)
-        ledger.update_gap_outcome(instance, prop["run_id"], prop["gap_index"], outcome)
+        if prop.get("kind") == "health":
+            ledger.update_health_outcome(instance, prop["run_id"], prop["index"], outcome)
+        else:
+            ledger.update_gap_outcome(instance, prop["run_id"], prop["index"], outcome)
         if outcome.status == "applied":
             app.state.proposals.pop(str(body.get("proposal_id")), None)
             return outcome

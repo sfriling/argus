@@ -27,6 +27,7 @@ const runningJob: ReviewJob = {
 };
 
 beforeEach(() => {
+  vi.clearAllMocks();   // reset call counts between tests (mocks are module-level)
   vi.mocked(api.fetchStatus).mockResolvedValue(doneJob);
   vi.mocked(api.runReview).mockResolvedValue(runningJob);
   vi.mocked(api.listRuns).mockResolvedValue([]);
@@ -62,7 +63,7 @@ describe('ReviewTab', () => {
 
   it('prepares and applies an edit via the diff modal', async () => {
     vi.mocked(api.proposeEdit).mockResolvedValue({
-      proposal_id: 'p1', run_id: '20260630T120000Z', gap_index: 0, skill_name: 'obsidian',
+      proposal_id: 'p1', run_id: '20260630T120000Z', kind: 'gap', gap_index: 0, skill_name: 'obsidian',
       path: '/h/skills/note-taking/obsidian/SKILL.md', is_new: false, old_sha256: 'abc',
       diff: '--- a\n+++ b\n@@ -1 +1 @@\n-old\n+new line\n', change_note: 'added a rule',
       warnings: [], injection_flags: [],
@@ -91,11 +92,55 @@ describe('ReviewTab', () => {
         gap_index: 0, status: 'applied', path: '/h/skills/obsidian/SKILL.md',
         backup_path: '/state/y.bak', new_sha256: 'x', applied_at: '', error: '',
       } }],
+      health: [],
       trigger: 'manual', created_at: '',
     });
     render(<ReviewTab instances={['local']} writebackEnabled />);
     expect(await screen.findByText('✓ applied')).toBeInTheDocument();
     expect(screen.queryByText('Prepare edit')).not.toBeInTheDocument();  // no re-prepare
+  });
+
+  it('fixes a skill-health finding via the Fix button', async () => {
+    vi.mocked(api.proposeHealthEdit).mockResolvedValue({
+      proposal_id: 'h1', run_id: '20260630T120000Z', kind: 'health', gap_index: 0, skill_name: 'obsidian',
+      path: '/h/skills/obsidian/SKILL.md', is_new: false, old_sha256: 'a',
+      diff: '--- a\n+++ b\n@@ -1 +1 @@\n-<EOM>\n+clean\n', change_note: 'removed legacy instruction',
+      warnings: [], injection_flags: [],
+    });
+    vi.mocked(api.applyEdit).mockResolvedValue({
+      gap_index: 0, status: 'applied', path: '/h/skills/obsidian/SKILL.md',
+      backup_path: '/state/h.bak', new_sha256: 'b', applied_at: '', error: '',
+    });
+    render(<ReviewTab instances={['local']} writebackEnabled />);
+    await waitFor(() => expect(screen.getByText(/subtle append guidance/)).toBeInTheDocument());
+    fireEvent.click(screen.getByText('Fix'));
+    await waitFor(() => expect(api.proposeHealthEdit).toHaveBeenCalledWith('local', '20260630T120000Z', 0));
+    fireEvent.click(await screen.findByText('Approve & write'));
+    await waitFor(() => expect(api.applyEdit).toHaveBeenCalledWith('local', 'h1'));
+    expect(await screen.findByText('✓ fixed')).toBeInTheDocument();
+  });
+
+  it('apply-all proposes every item and writes them from one button', async () => {
+    vi.mocked(api.proposeEdit).mockResolvedValue({
+      proposal_id: 'g1', run_id: 'r', kind: 'gap', gap_index: 0, skill_name: 'obsidian',
+      path: '/p', is_new: false, old_sha256: 'a', diff: '@@ -1 +1 @@\n-x\n+y\n',
+      change_note: 'gap fix', warnings: [], injection_flags: [],
+    });
+    vi.mocked(api.proposeHealthEdit).mockResolvedValue({
+      proposal_id: 'h1', run_id: 'r', kind: 'health', gap_index: 0, skill_name: 'obsidian',
+      path: '/p', is_new: false, old_sha256: 'a', diff: '@@ -1 +1 @@\n-<EOM>\n+ok\n',
+      change_note: 'health fix', warnings: [], injection_flags: [],
+    });
+    vi.mocked(api.applyEdit).mockResolvedValue({
+      gap_index: 0, status: 'applied', path: '/p', backup_path: '/b', new_sha256: 'c', applied_at: '', error: '',
+    });
+    render(<ReviewTab instances={['local']} writebackEnabled />);
+    // 1 gap + 1 health finding -> applicable count 2
+    fireEvent.click(await screen.findByText('Apply all edits (2)'));
+    await waitFor(() => expect(api.proposeEdit).toHaveBeenCalled());
+    await waitFor(() => expect(api.proposeHealthEdit).toHaveBeenCalled());
+    fireEvent.click(await screen.findByText(/Approve & write all/));
+    await waitFor(() => expect(api.applyEdit).toHaveBeenCalledTimes(2));   // both written from one confirm
   });
 
   it('runs a review on click', async () => {
