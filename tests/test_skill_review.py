@@ -8,8 +8,22 @@ import sys
 
 from backend.skill_review import (
     triage, skill_drift, report_from_tool_input, review,
-    build_cli_prompt, parse_cli_result, gather_memory, assemble,
+    build_cli_prompt, parse_cli_result, gather_memory, assemble, skills_root_for,
 )
+
+
+def test_skills_root_resolves_profile_dir():
+    class I:            # non-default profile -> the profile's own skills tree
+        hermes_home = "/h"; profile = "orchestrator"
+    assert skills_root_for(I()) == "/h/profiles/orchestrator/skills"
+
+    class D:            # default profile -> the shared tree
+        hermes_home = "/h"; profile = "default"
+    assert skills_root_for(D()) == "/h/skills"
+
+    class B:            # blank profile -> shared tree (back-compat)
+        hermes_home = "/h\\"; profile = ""
+    assert skills_root_for(B()) == "/h/skills"
 from backend.transport import RunResult
 
 

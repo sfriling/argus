@@ -97,6 +97,18 @@ def read_trajectory(runner, instance) -> list[dict]:
     return events
 
 
+def skills_root_for(instance) -> str:
+    """The skills dir the active profile actually reads. A Hermes profile is its own
+    HERMES_HOME (`<root>/profiles/<name>`), so a `-p <profile>` session reads
+    `<root>/profiles/<profile>/skills` — NOT `<root>/skills` (the *default* profile).
+    gather_skills lists `-p <profile>` skills, so it must read that same tree."""
+    home = instance.hermes_home.rstrip("/\\")
+    prof = (getattr(instance, "profile", "") or "").strip()
+    if prof and prof != "default":
+        return f"{home}/profiles/{prof}/skills"
+    return f"{home}/skills"
+
+
 def gather_skills(runner, instance, max_custom: int = 8) -> tuple[dict[str, str], list[str], set[str]]:
     """Return ({custom_name: SKILL.md content}, all_skill_names, custom_name_set) for an instance.
     Reads the SKILL.md files directly (`skills inspect` is slow/network-bound and times out)."""
@@ -116,7 +128,7 @@ def gather_skills(runner, instance, max_custom: int = 8) -> tuple[dict[str, str]
         if any(c.lower() == "local" for c in cells):
             custom.append((name, cells[1] if len(cells) > 1 else ""))
 
-    skills_root = instance.hermes_home.rstrip("/\\") + "/skills"
+    skills_root = skills_root_for(instance)
     contents: dict[str, str] = {}
     for name, category in custom[:max_custom]:
         # name may be truncated in the table (…); only read clean names
