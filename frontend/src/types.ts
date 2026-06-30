@@ -183,6 +183,18 @@ export type ApplyOutcome = {
   error: string;
 };
 
+export type GapRecord = {
+  gap: SkillGap;
+  outcome: ApplyOutcome | null;
+};
+
+export type LedgerRecord = {
+  report: ReviewReport;
+  gaps: GapRecord[];
+  trigger: string;
+  created_at: string;
+};
+
 export type LedgerIndexEntry = {
   run_id: string;
   instance: string;

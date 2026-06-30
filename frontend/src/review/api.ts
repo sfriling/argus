@@ -1,4 +1,4 @@
-import type { ReviewJob, LedgerIndexEntry, ProposedEdit, ApplyOutcome } from '../types';
+import type { ReviewJob, LedgerIndexEntry, ProposedEdit, ApplyOutcome, LedgerRecord } from '../types';
 
 async function postJson(url: string, body: unknown) {
   const res = await fetch(url, {
@@ -26,6 +26,13 @@ export function applyEdit(instance: string, proposal_id: string): Promise<ApplyO
 export async function listRuns(instance: string): Promise<LedgerIndexEntry[]> {
   const res = await fetch(`/api/skill-review/${encodeURIComponent(instance)}/runs`);
   if (!res.ok) return [];
+  return res.json();
+}
+
+/** A single run's full record, incl. per-gap apply outcomes (survives navigation/restart). */
+export async function getRun(instance: string, runId: string): Promise<LedgerRecord | null> {
+  const res = await fetch(`/api/skill-review/${encodeURIComponent(instance)}/runs/${encodeURIComponent(runId)}`);
+  if (!res.ok) return null;
   return res.json();
 }
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReviewJob, SkillGap, LedgerIndexEntry, ProposedEdit, ApplyOutcome } from '../types';
-import { runReview, fetchStatus, listRuns, proposeEdit, applyEdit } from './api';
+import { runReview, fetchStatus, listRuns, proposeEdit, applyEdit, getRun } from './api';
 
 function elapsed(fromIso: string): string {
   if (!fromIso) return '';
@@ -8,11 +8,24 @@ function elapsed(fromIso: string): string {
   return secs < 60 ? `${secs}s` : `${Math.floor(secs / 60)}m ${secs % 60}s`;
 }
 
-function GapCard({ g, index, writebackEnabled, onPrepare, preparing }:
-  { g: SkillGap; index: number; writebackEnabled: boolean; onPrepare: (i: number) => void; preparing: boolean }) {
+function AppliedChip({ outcome }: { outcome: ApplyOutcome }) {
+  return (
+    <div className="mt-3 text-xs flex items-center gap-2" style={{ color: '#22c55e' }}>
+      <span className="px-1.5 py-0.5 rounded-md" style={{ background: '#22c55e18' }}>✓ applied</span>
+      {outcome.backup_path && (
+        <span style={{ color: '#52525b' }}>backup: <span className="font-mono">{outcome.backup_path}</span></span>
+      )}
+    </div>
+  );
+}
+
+function GapCard({ g, index, writebackEnabled, onPrepare, preparing, outcome }:
+  { g: SkillGap; index: number; writebackEnabled: boolean; onPrepare: (i: number) => void;
+    preparing: boolean; outcome?: ApplyOutcome }) {
   const isNew = g.target_skill.toLowerCase() === 'new';
   const truncated = g.target_skill.includes('…') || g.target_skill.includes('...');
-  const canApply = writebackEnabled && !isNew && !truncated && !!g.target_skill;
+  const isApplied = outcome?.status === 'applied';
+  const canApply = writebackEnabled && !isNew && !truncated && !!g.target_skill && !isApplied;
   return (
     <div className="rounded-xl border p-4" style={{ background: '#111113', borderColor: '#1f1f23' }}>
       <div className="flex items-center gap-2 mb-2">
@@ -28,6 +41,7 @@ function GapCard({ g, index, writebackEnabled, onPrepare, preparing }:
         <pre className="text-xs rounded-lg p-3 overflow-x-auto whitespace-pre-wrap"
           style={{ background: '#0a0a0b', color: '#d4d4d8' }}>{g.suggested_edit}</pre>
       )}
+      {isApplied && outcome && <AppliedChip outcome={outcome} />}
       {canApply && (
         <button disabled={preparing} onClick={() => onPrepare(index)}
           className="mt-3 text-xs font-medium px-3 py-1.5 rounded-lg"
@@ -130,10 +144,26 @@ export function ReviewTab({ instances, writebackEnabled = false }:
   const [runs, setRuns] = useState<LedgerIndexEntry[]>([]);
   const [proposal, setProposal] = useState<ProposedEdit | null>(null);
   const [preparingIdx, setPreparingIdx] = useState<number | null>(null);
-  const [applied, setApplied] = useState<Record<number, string>>({});
+  const [outcomes, setOutcomes] = useState<Record<number, ApplyOutcome>>({});
+  const [refreshNonce, setRefreshNonce] = useState(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const running = job?.status === 'running';
+  const report = job?.status === 'done' ? job.report : null;
+
+  // Per-gap apply status comes from the LEDGER (server-side), so "applied" survives tab switches and
+  // restarts — and a gap already applied won't offer "Prepare edit" again.
+  useEffect(() => {
+    if (!report?.run_id || report.instance !== instance) { setOutcomes({}); return; }
+    let alive = true;
+    getRun(instance, report.run_id).then((rec) => {
+      if (!alive || !rec) return;
+      const m: Record<number, ApplyOutcome> = {};
+      rec.gaps.forEach((g, i) => { if (g.outcome) m[i] = g.outcome; });
+      setOutcomes(m);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [instance, report?.run_id, report?.instance, refreshNonce]);
 
   async function prepare(gapIndex: number) {
     if (!job?.report?.run_id) return;
@@ -182,8 +212,6 @@ export function ReviewTab({ instances, writebackEnabled = false }:
       setError(e instanceof Error ? e.message : String(e));
     }
   }
-
-  const report = job?.status === 'done' ? job.report : null;
 
   return (
     <div className="space-y-6">
@@ -237,15 +265,8 @@ export function ReviewTab({ instances, writebackEnabled = false }:
             <Section label={`Gaps (${report.gaps.length})`}>
               <div className="space-y-3">
                 {report.gaps.map((g, i) => (
-                  <div key={i}>
-                    <GapCard g={g} index={i} writebackEnabled={writebackEnabled}
-                      onPrepare={prepare} preparing={preparingIdx === i} />
-                    {applied[i] && (
-                      <p className="text-xs mt-1" style={{ color: '#22c55e' }}>
-                        ✓ applied — backup: <span className="font-mono">{applied[i]}</span>
-                      </p>
-                    )}
-                  </div>
+                  <GapCard key={i} g={g} index={i} writebackEnabled={writebackEnabled}
+                    onPrepare={prepare} preparing={preparingIdx === i} outcome={outcomes[i]} />
                 ))}
               </div>
             </Section>
@@ -309,7 +330,10 @@ export function ReviewTab({ instances, writebackEnabled = false }:
           proposal={proposal}
           onClose={() => setProposal(null)}
           onApplied={(o) => {
-            if (o.status === 'applied') setApplied((m) => ({ ...m, [proposal.gap_index]: o.backup_path }));
+            if (o.status === 'applied') {
+              setOutcomes((m) => ({ ...m, [proposal.gap_index]: o }));   // optimistic
+              setRefreshNonce((n) => n + 1);                              // reconcile from the ledger
+            }
             setProposal(null);
           }}
         />

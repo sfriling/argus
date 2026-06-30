@@ -30,6 +30,7 @@ beforeEach(() => {
   vi.mocked(api.fetchStatus).mockResolvedValue(doneJob);
   vi.mocked(api.runReview).mockResolvedValue(runningJob);
   vi.mocked(api.listRuns).mockResolvedValue([]);
+  vi.mocked(api.getRun).mockResolvedValue(null);   // no prior outcomes by default
 });
 
 describe('ReviewTab', () => {
@@ -77,7 +78,24 @@ describe('ReviewTab', () => {
     const approve = await screen.findByText('Approve & write');
     fireEvent.click(approve);
     await waitFor(() => expect(api.applyEdit).toHaveBeenCalledWith('local', 'p1'));
-    expect(await screen.findByText(/applied — backup/)).toBeInTheDocument();
+    expect(await screen.findByText('✓ applied')).toBeInTheDocument();
+    expect(screen.getByText('/state/x.bak')).toBeInTheDocument();
+    // the gap is applied -> Prepare edit must not be offered again
+    expect(screen.queryByText('Prepare edit')).not.toBeInTheDocument();
+  });
+
+  it('reflects an already-applied gap from the ledger on mount (survives navigation)', async () => {
+    vi.mocked(api.getRun).mockResolvedValue({
+      report,
+      gaps: [{ gap: report.gaps[0], outcome: {
+        gap_index: 0, status: 'applied', path: '/h/skills/obsidian/SKILL.md',
+        backup_path: '/state/y.bak', new_sha256: 'x', applied_at: '', error: '',
+      } }],
+      trigger: 'manual', created_at: '',
+    });
+    render(<ReviewTab instances={['local']} writebackEnabled />);
+    expect(await screen.findByText('✓ applied')).toBeInTheDocument();
+    expect(screen.queryByText('Prepare edit')).not.toBeInTheDocument();  // no re-prepare
   });
 
   it('runs a review on click', async () => {
