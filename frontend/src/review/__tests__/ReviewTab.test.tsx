@@ -2,7 +2,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { ReviewTab } from '../ReviewTab';
 import * as api from '../api';
-import type { ReviewReport } from '../../types';
+import type { ReviewReport, ReviewJob } from '../../types';
 
 vi.mock('../api');
 
@@ -17,13 +17,21 @@ const report: ReviewReport = {
   drift: [{ concern: "'hermes-cron' is not on every instance", detail: 'present on local' }],
 };
 
+const doneJob: ReviewJob = {
+  status: 'done', instance: 'local', started_at: '', finished_at: '', error: '', report,
+};
+const runningJob: ReviewJob = {
+  status: 'running', instance: 'local', started_at: new Date().toISOString(),
+  finished_at: '', error: '', report: null,
+};
+
 beforeEach(() => {
-  vi.mocked(api.fetchReport).mockResolvedValue(report);
-  vi.mocked(api.runReview).mockResolvedValue(report);
+  vi.mocked(api.fetchStatus).mockResolvedValue(doneJob);
+  vi.mocked(api.runReview).mockResolvedValue(runningJob);
 });
 
 describe('ReviewTab', () => {
-  it('renders a cached report: summary, gap, health, drift', async () => {
+  it('renders a completed report: summary, gap, health, drift', async () => {
     render(<ReviewTab instances={['local']} />);
     await waitFor(() => expect(screen.getByText('Found a patch gap.')).toBeInTheDocument());
     expect(screen.getByText('Patch loop')).toBeInTheDocument();
@@ -37,5 +45,13 @@ describe('ReviewTab', () => {
     render(<ReviewTab instances={['local']} />);
     fireEvent.click(screen.getByText('Run review'));
     await waitFor(() => expect(api.runReview).toHaveBeenCalledWith('local'));
+  });
+
+  it('shows an in-progress indicator while a run is live (server-driven)', async () => {
+    vi.mocked(api.fetchStatus).mockResolvedValue(runningJob);
+    render(<ReviewTab instances={['local']} />);
+    // the button reflects server-side job state, so the indicator survives remounts
+    const btn = await screen.findByText('Reviewing…');
+    expect(btn.closest('button')!.disabled).toBe(true);
   });
 });

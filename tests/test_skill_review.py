@@ -194,10 +194,39 @@ def test_run_happy_path_with_mocked_review(monkeypatch):
                     enable_skill_review=True)
     client = _client(monkeypatch, cfg)
     monkeypatch.setattr("backend.app.sr.review",
-                        lambda *a, **k: ReviewReport(summary="mocked", model="m"))
+                        lambda *a, **k: ReviewReport(summary="mocked", model="m", instance="local"))
+    # the run is async now: POST returns immediately in the "running" state
     r = client.post("/api/skill-review/local/run")
     assert r.status_code == 200
-    assert r.json()["summary"] == "mocked"
+    assert r.json()["status"] == "running"
+    assert r.json()["instance"] == "local"
+    # poll status until the background thread finishes
+    import time
+    for _ in range(50):
+        st = client.get("/api/skill-review/status").json()
+        if st["status"] != "running":
+            break
+        time.sleep(0.05)
+    assert st["status"] == "done"
+    assert st["report"]["summary"] == "mocked"
+    # back-compat report endpoint exposes the same completed report
+    assert client.get("/api/skill-review/report").json()["summary"] == "mocked"
+
+
+def test_run_conflict_when_already_running(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
+    cfg = AppConfig(instances=[Instance(name="local", transport="local", hermes_home="/h")],
+                    enable_skill_review=True)
+    client = _client(monkeypatch, cfg)
+    import threading
+    gate = threading.Event()
+    monkeypatch.setattr("backend.app.sr.review",
+                        lambda *a, **k: (gate.wait(2), ReviewReport(summary="slow", instance="local"))[1])
+    first = client.post("/api/skill-review/local/run")
+    assert first.status_code == 200 and first.json()["status"] == "running"
+    second = client.post("/api/skill-review/local/run")   # while the first is still in flight
+    assert second.status_code == 409
+    gate.set()   # let the first finish so the thread doesn't dangle
 
 
 def test_overview_exposes_skill_review_feature(monkeypatch):

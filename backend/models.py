@@ -157,6 +157,17 @@ class ReviewReport(BaseModel):
     drift: list[DriftItem] = Field(default_factory=list)
 
 
+class ReviewJob(BaseModel):
+    """Server-side status of a skill-review run, so an in-progress review is
+    visible across page reloads / tab switches (the run is long and async)."""
+    status: str = "idle"             # "idle" | "running" | "done" | "error"
+    instance: str = ""
+    started_at: str = ""
+    finished_at: str = ""
+    error: str = ""
+    report: ReviewReport | None = None
+
+
 class Features(BaseModel):
     skill_review: bool = False
 

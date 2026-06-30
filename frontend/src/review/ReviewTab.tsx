@@ -1,6 +1,12 @@
-import { useEffect, useState } from 'react';
-import type { ReviewReport, SkillGap } from '../types';
-import { runReview, fetchReport } from './api';
+import { useEffect, useRef, useState } from 'react';
+import type { ReviewJob, SkillGap } from '../types';
+import { runReview, fetchStatus } from './api';
+
+function elapsed(fromIso: string): string {
+  if (!fromIso) return '';
+  const secs = Math.max(0, Math.floor((Date.now() - new Date(fromIso).getTime()) / 1000));
+  return secs < 60 ? `${secs}s` : `${Math.floor(secs / 60)}m ${secs % 60}s`;
+}
 
 function GapCard({ g }: { g: SkillGap }) {
   const isNew = g.target_skill.toLowerCase() === 'new';
@@ -34,25 +40,45 @@ function Section({ label, children }: { label: string; children: React.ReactNode
 
 export function ReviewTab({ instances }: { instances: string[] }) {
   const [instance, setInstance] = useState(instances[0] ?? '');
-  const [report, setReport] = useState<ReviewReport | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [job, setJob] = useState<ReviewJob | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [, tick] = useState(0); // re-render so the elapsed timer advances
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const running = job?.status === 'running';
+
+  // Hydrate from server-side job state on mount + while a run is in flight,
+  // so an in-progress review shows up even after navigating away and back.
   useEffect(() => {
-    fetchReport().then(setReport).catch(() => {});
+    let alive = true;
+    const sync = async () => {
+      const j = await fetchStatus().catch(() => null);
+      if (!alive || !j) return;
+      setJob(j);
+      if (j.status === 'error') setError(j.error || 'review failed');
+    };
+    sync();
+    pollRef.current = setInterval(() => {
+      // poll fast while running (to catch completion), slowly otherwise
+      sync();
+      tick((n) => n + 1); // keep the elapsed counter live
+    }, 2000);
+    return () => {
+      alive = false;
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
   }, []);
 
   async function run() {
-    setBusy(true);
     setError(null);
     try {
-      setReport(await runReview(instance));
+      setJob(await runReview(instance));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
     }
   }
+
+  const report = job?.status === 'done' ? job.report : null;
 
   return (
     <div className="space-y-6">
@@ -67,10 +93,10 @@ export function ReviewTab({ instances }: { instances: string[] }) {
             {instances.map((i) => <option key={i} value={i}>{i}</option>)}
           </select>
         )}
-        <button disabled={busy} onClick={run}
+        <button disabled={running} onClick={run}
           className="ml-auto text-xs font-medium px-3 py-1.5 rounded-lg"
-          style={{ color: '#0a0a0b', background: busy ? '#27272a' : '#22c55e' }}>
-          {busy ? 'Reviewing…' : 'Run review'}
+          style={{ color: '#0a0a0b', background: running ? '#27272a' : '#22c55e' }}>
+          {running ? 'Reviewing…' : 'Run review'}
         </button>
       </div>
 
@@ -80,8 +106,19 @@ export function ReviewTab({ instances }: { instances: string[] }) {
         API key if set; a run costs a few cents.)
       </p>
 
-      {error && <p className="text-sm" style={{ color: '#fca5a5' }}>{error}</p>}
-      {busy && !error && <p className="text-sm" style={{ color: '#52525b' }}>Reviewing recent sessions…</p>}
+      {/* in-progress banner, driven by server-side job state so it survives tab switches */}
+      {running && (
+        <div className="flex items-center gap-2.5 rounded-lg px-3 py-2.5"
+          style={{ background: '#0a0a0b', border: '1px solid #1f1f23' }}>
+          <span className="inline-block w-2 h-2 rounded-full animate-pulse" style={{ background: '#22c55e' }} />
+          <span className="text-sm" style={{ color: '#d4d4d8' }}>
+            Reviewing <span style={{ color: '#f4f4f5' }}>{job?.instance}</span>…
+          </span>
+          <span className="text-xs ml-auto font-mono" style={{ color: '#52525b' }}>{elapsed(job?.started_at ?? '')}</span>
+        </div>
+      )}
+
+      {error && !running && <p className="text-sm" style={{ color: '#fca5a5' }}>{error}</p>}
 
       {/* only show a report that belongs to the selected instance */}
       {report && report.instance === instance && (
@@ -127,7 +164,7 @@ export function ReviewTab({ instances }: { instances: string[] }) {
         </>
       )}
 
-      {(!report || report.instance !== instance) && !busy && !error && (
+      {(!report || report.instance !== instance) && !running && !error && (
         <p className="text-sm" style={{ color: '#52525b' }}>
           No review for <span style={{ color: '#a1a1aa' }}>{instance}</span> yet. Click “Run review” to start.
         </p>

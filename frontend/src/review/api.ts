@@ -1,6 +1,8 @@
-import type { ReviewReport } from '../types';
+import type { ReviewJob } from '../types';
 
-export async function runReview(instance: string): Promise<ReviewReport> {
+/** Start a review. Returns the job in its initial "running" state (the work
+ *  continues server-side). Throws on 403 (disabled) / 409 (already running). */
+export async function runReview(instance: string): Promise<ReviewJob> {
   const res = await fetch(`/api/skill-review/${encodeURIComponent(instance)}/run`, { method: 'POST' });
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;
@@ -15,8 +17,9 @@ export async function runReview(instance: string): Promise<ReviewReport> {
   return res.json();
 }
 
-export async function fetchReport(): Promise<ReviewReport | null> {
-  const res = await fetch('/api/skill-review/report');
+/** Server-side status of the most recent / in-flight review. Survives reloads. */
+export async function fetchStatus(): Promise<ReviewJob | null> {
+  const res = await fetch('/api/skill-review/status');
   if (!res.ok) return null;
-  return res.json(); // server returns null when there's no cached report
+  return res.json();
 }

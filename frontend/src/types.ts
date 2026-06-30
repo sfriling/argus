@@ -156,6 +156,15 @@ export type ReviewReport = {
   drift: DriftItem[];
 };
 
+export type ReviewJob = {
+  status: 'idle' | 'running' | 'done' | 'error';
+  instance: string;
+  started_at: string;
+  finished_at: string;
+  error: string;
+  report: ReviewReport | null;
+};
+
 export type ConfigInstance = {
   name: string;
   transport: 'local' | 'ssh';
