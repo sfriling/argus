@@ -1,4 +1,5 @@
 import json
+from datetime import date
 
 from backend.aggregator import Aggregator, build_overview
 from backend.config import AppConfig
@@ -18,7 +19,16 @@ def _healthy_runner(home):
         },
         files={
             home + "/active_profile": "orchestrator\n",
-            home + "/reliability/trajectories.jsonl": '{"tool":"cronjob","field":"schedule","action":"rejected","attempt":2}',
+            home + "/reliability/trajectories.jsonl": json.dumps(
+                {
+                    "tool": "cronjob",
+                    "field": "schedule",
+                    "action": "rejected",
+                    "attempt": 2,
+                    # dated to today so it counts toward the host-local "today" tally
+                    "session_id": date.today().strftime("%Y%m%d") + "_120000_agg",
+                }
+            ),
         },
         dirs={home + "/profiles": ["orchestrator", "executor"]},
         exist={home, home + "/kanban/.dispatcher.lock"},

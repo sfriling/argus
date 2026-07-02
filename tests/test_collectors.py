@@ -66,14 +66,43 @@ def test_crons_empty():
 
 def test_reliability_counts_and_order():
     lines = [
-        '{"tool":"patch","field":"path","action":"inferred","attempt":1}',
-        '{"tool":"cronjob","field":"schedule","action":"rejected","attempt":1}',
-        '{"tool":"cronjob","field":"schedule","action":"rejected","attempt":2}',
+        '{"tool":"patch","field":"path","action":"inferred","attempt":1,"session_id":"20260702_090000_aaa","turn_id":"20260702_090000_aaa:t:1"}',
+        '{"tool":"cronjob","field":"schedule","action":"rejected","attempt":1,"session_id":"20260702_090000_aaa","turn_id":"20260702_090000_aaa:t:2"}',
+        '{"tool":"cronjob","field":"schedule","action":"rejected","attempt":2,"session_id":"20260702_090000_aaa","turn_id":"20260702_090000_aaa:t:3"}',
     ]
-    rel = parse_reliability("\n".join(lines))
+    rel = parse_reliability("\n".join(lines), today="20260702")
     assert rel.today.catches == 3
     assert rel.today.loop_breaks == 1
     assert rel.recent[0].action == "rejected" and rel.recent[0].attempt == 2  # newest first
+
+
+def test_reliability_today_excludes_older_days():
+    # Only the 07-02 event should count toward "today"; the 06-28/06-29 loop-breaks are historical.
+    lines = [
+        '{"tool":"cronjob","field":"schedule","action":"rejected","attempt":2,"session_id":"20260628_161852_a","turn_id":"20260628_161852_a:t:1"}',
+        '{"tool":"cronjob","field":"schedule","action":"rejected","attempt":3,"session_id":"20260629_160624_b","turn_id":"20260629_160624_b:t:1"}',
+        '{"tool":"patch","field":"path","action":"inferred","attempt":1,"session_id":"20260702_090000_c","turn_id":"20260702_090000_c:t:1"}',
+    ]
+    rel = parse_reliability("\n".join(lines), today="20260702")
+    assert rel.today.catches == 1  # only the 07-02 inferred event
+    assert rel.today.loop_breaks == 0  # both loop-breaks are on prior days
+
+
+def test_reliability_loop_breaks_dedup_by_turn():
+    # Mirrors the real trajectory shape: turn_id is "<session>:<turn>:<call_hash>" where the
+    # trailing hash differs per call. A single looping turn re-issues the same call
+    # (attempts 2..4) -> ONE loop-break, not three. A second, distinct turn -> another.
+    s = "20260702_100000_z"
+    turnA = f"{s}:{s}"  # same turn across its attempts, differing call hash
+    turnB = "20260702_110000_z:20260702_110000_z"
+    lines = [
+        f'{{"tool":"cronjob","field":"schedule","action":"rejected","attempt":2,"session_id":"{s}","turn_id":"{turnA}:h1"}}',
+        f'{{"tool":"cronjob","field":"schedule","action":"rejected","attempt":3,"session_id":"{s}","turn_id":"{turnA}:h2"}}',
+        f'{{"tool":"cronjob","field":"schedule","action":"rejected","attempt":4,"session_id":"{s}","turn_id":"{turnA}:h3"}}',
+        f'{{"tool":"cronjob","field":"schedule","action":"rejected","attempt":2,"session_id":"20260702_110000_z","turn_id":"{turnB}:h1"}}',
+    ]
+    rel = parse_reliability("\n".join(lines), today="20260702")
+    assert rel.today.loop_breaks == 2  # turnA and turnB, regardless of attempt count
 
 
 def test_reliability_missing_file():
